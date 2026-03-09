@@ -81,7 +81,7 @@ The prewriter has access to the same fragment tools as the writer (read-only + p
 
 ### Customization
 
-Prewriter blocks are customizable through the Agent Context panel (block editor at `generation.prewriter`). Users can add custom blocks, override instruction content, or reorder blocks.
+Prewriter blocks are customizable through the Agent Context panel (block editor at `generation.prewriter`). Users can Add Context Blocks, override instruction content, or reorder blocks.
 
 ## Writer Brief Context
 

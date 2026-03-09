@@ -454,7 +454,7 @@ When a custom block is expanded:
 
 ### Creating custom blocks
 
-Click **Add Custom Block** at the bottom to open the creation dialog:
+Click **Add Context Block** at the bottom to open the creation dialog:
 - **Name** — display name for the block
 - **Role** — system or user (determines which LLM message it goes in)
 - **Type** — simple (plain text) or script (JavaScript with `ctx` access)

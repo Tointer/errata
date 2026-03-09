@@ -646,7 +646,7 @@ export const HELP_SECTIONS: HelpSection[] = [
         content: (
           <>
             <P>
-              Click <strong className="text-foreground/75">Add Custom Block</strong> at the bottom of the
+              Click <strong className="text-foreground/75">Add Context Block</strong> at the bottom of the
               Block Editor to inject your own content into the model prompt. Custom blocks sit alongside
               builtin blocks and can be reordered, enabled, or disabled the same way.
             </P>
