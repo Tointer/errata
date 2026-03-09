@@ -475,9 +475,7 @@ function AgentBlockEditor({ storyId, agentName, agents, onBack }: AgentBlockEdit
     }
   }, [storyId, agentName])
 
-  const handleImport = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    if (!file) return
+  const importFile = useCallback(async (file: File) => {
     try {
       const text = await file.text()
       const parsed = JSON.parse(text)
@@ -487,9 +485,44 @@ function AgentBlockEditor({ storyId, agentName, agents, onBack }: AgentBlockEdit
     } catch {
       // silently fail
     }
-    // Reset input so the same file can be re-imported
-    e.target.value = ''
   }, [storyId, agentName, queryClient])
+
+  const handleImport = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (file) await importFile(file)
+    e.target.value = ''
+  }, [importFile])
+
+  const [isDraggingFile, setIsDraggingFile] = useState(false)
+  const dragCountRef = useRef(0)
+
+  const handleFileDragEnter = useCallback((e: React.DragEvent) => {
+    e.preventDefault()
+    dragCountRef.current++
+    if (e.dataTransfer.types.includes('Files')) setIsDraggingFile(true)
+  }, [])
+
+  const handleFileDragLeave = useCallback((e: React.DragEvent) => {
+    e.preventDefault()
+    dragCountRef.current--
+    if (dragCountRef.current <= 0) {
+      dragCountRef.current = 0
+      setIsDraggingFile(false)
+    }
+  }, [])
+
+  const handleFileDragOver = useCallback((e: React.DragEvent) => {
+    e.preventDefault()
+    e.dataTransfer.dropEffect = 'copy'
+  }, [])
+
+  const handleFileDrop = useCallback(async (e: React.DragEvent) => {
+    e.preventDefault()
+    dragCountRef.current = 0
+    setIsDraggingFile(false)
+    const file = e.dataTransfer.files[0]
+    if (file?.name.endsWith('.json')) await importFile(file)
+  }, [importFile])
 
   const roleTransitions = useMemo(() => {
     const set = new Set<number>()
@@ -521,7 +554,23 @@ function AgentBlockEditor({ storyId, agentName, agents, onBack }: AgentBlockEdit
   const availableTools = data.availableTools ?? []
 
   return (
-    <div className="flex h-full min-h-0 flex-col">
+    <div
+      className="flex h-full min-h-0 flex-col relative"
+      onDragEnter={handleFileDragEnter}
+      onDragLeave={handleFileDragLeave}
+      onDragOver={handleFileDragOver}
+      onDrop={handleFileDrop}
+    >
+      {/* File drop overlay */}
+      {isDraggingFile && (
+        <div className="absolute inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm border-2 border-dashed border-primary/40 rounded-lg">
+          <div className="flex flex-col items-center gap-2 text-primary/60">
+            <Download className="size-8" />
+            <p className="text-sm font-medium">Drop to import config</p>
+          </div>
+        </div>
+      )}
+
       {/* Header with back button */}
       <div className="px-3 py-2.5 border-b border-border/30 flex items-center gap-2">
         <button
@@ -542,7 +591,7 @@ function AgentBlockEditor({ storyId, agentName, agents, onBack }: AgentBlockEdit
             onClick={handleExport}
             title="Export config"
           >
-            <Download className="size-3.5" />
+            <Upload className="size-3.5" />
           </Button>
           <Button
             size="sm"
@@ -551,7 +600,7 @@ function AgentBlockEditor({ storyId, agentName, agents, onBack }: AgentBlockEdit
             onClick={() => fileInputRef.current?.click()}
             title="Import config"
           >
-            <Upload className="size-3.5" />
+            <Download className="size-3.5" />
           </Button>
           <input
             ref={fileInputRef}
