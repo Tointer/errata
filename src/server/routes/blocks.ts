@@ -13,26 +13,41 @@ import { getAgentBlockConfig, saveAgentBlockConfig, type AgentBlockConfig } from
 export function blockRoutes(dataDir: string) {
   return new Elysia({ detail: { tags: ['Blocks'] } })
     .get('/stories/:storyId/blocks', async ({ params, set }) => {
-      const story = await getStory(dataDir, params.storyId)
-      if (!story) {
-        set.status = 404
-        return { error: 'Story not found' }
+      try {
+        ensureCoreAgentsRegistered()
+
+        const story = await getStory(dataDir, params.storyId)
+        if (!story) {
+          set.status = 404
+          return { error: 'Story not found' }
+        }
+        const config = await getBlockConfig(dataDir, params.storyId)
+        // Build default blocks for metadata
+        const ctxState = await buildContextState(dataDir, params.storyId, '(preview)')
+        const defaultBlocks = createDefaultBlocks(ctxState)
+        const builtinBlocks = defaultBlocks.map(b => ({
+          id: b.id,
+          role: b.role,
+          order: b.order,
+          source: b.source,
+          contentPreview: typeof b.content === 'string'
+            ? b.content.slice(0, 200)
+            : '',
+        }))
+        return { config, builtinBlocks }
+      } catch (error) {
+        console.error('[blocks route] failed', {
+          storyId: params.storyId,
+          error,
+          stack: error instanceof Error ? error.stack : undefined,
+        })
+        throw error
       }
-      const config = await getBlockConfig(dataDir, params.storyId)
-      // Build default blocks for metadata
-      const ctxState = await buildContextState(dataDir, params.storyId, '(preview)')
-      const defaultBlocks = createDefaultBlocks(ctxState)
-      const builtinBlocks = defaultBlocks.map(b => ({
-        id: b.id,
-        role: b.role,
-        order: b.order,
-        source: b.source,
-        contentPreview: b.content.slice(0, 200),
-      }))
-      return { config, builtinBlocks }
     }, { detail: { summary: 'Get block config and builtin block metadata' } })
 
     .get('/stories/:storyId/blocks/preview', async ({ params, set }) => {
+      ensureCoreAgentsRegistered()
+
       const story = await getStory(dataDir, params.storyId)
       if (!story) {
         set.status = 404
