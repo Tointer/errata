@@ -24,16 +24,16 @@ describe('analysis-tools', () => {
   })
 
   describe('createAnalysisTools', () => {
-    it('returns all six tools', () => {
+    it('returns all available analysis tools in declaration order', () => {
       const collector = createEmptyCollector()
       const tools = createAnalysisTools(collector)
       expect(Object.keys(tools)).toEqual([
         'updateSummary',
         'reportMentions',
         'reportContradictions',
-        'suggestFragment',
         'reportTimeline',
         'updateFragment',
+        'suggestFragment',
         'suggestDirections',
       ])
     })
