@@ -260,6 +260,33 @@ describe('generation endpoint', () => {
     expect(systemText).toContain('Do not call tools unless continuity depends on it.')
   })
 
+  it('POST /stories/:storyId/generate passes resolved temperature to the writer agent', async () => {
+    const story = makeStory({
+      modelOverrides: {
+        'generation.writer': { temperature: 0.42 },
+      },
+    })
+    await updateStory(dataDir, story)
+
+    mockAgentStream.mockResolvedValue(
+      createMockStreamResult('Generated text.') as any,
+    )
+
+    const res = await api(`/stories/${storyId}/generate`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        input: 'Write something',
+        saveResult: false,
+      }),
+    })
+
+    expect(res.status).toBe(200)
+
+    const callArgs = mockAgentCtor.mock.calls[0][0] as any
+    expect(callArgs.temperature).toBe(0.42)
+  })
+
   it('POST /stories/:storyId/generate includes fragment tools', async () => {
     mockAgentStream.mockResolvedValue(
       createMockStreamResult('Generated text.') as any,
