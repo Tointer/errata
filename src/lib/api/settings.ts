@@ -24,6 +24,7 @@ export const settings = {
     guidedContinuePrompt?: string
     guidedSceneSettingPrompt?: string
     guidedSuggestPrompt?: string
+    disableThinking?: boolean
   }) =>
     apiFetch<StoryMeta>(`/stories/${storyId}/settings`, {
       method: 'PATCH',

@@ -1,5 +1,5 @@
-import { getModel } from '../llm/client'
-import { ToolLoopAgent, stepCountIs } from 'ai'
+import { getModel, buildProviderOptions } from '../llm/client'
+import { ToolLoopAgent, stepCountIs, type ProviderOptions } from 'ai'
 import { instructionRegistry } from '../instructions'
 import { getStory, updateStory, listFragments, getFragment, updateFragment } from '../fragments/storage'
 import { getActiveProseIds } from '../fragments/prose-chain'
@@ -85,6 +85,7 @@ async function compactSummary(
   maxCharacters: number,
   targetCharacters: number,
   requestLogger: ReturnType<typeof logger.child>,
+  providerOptions?: ProviderOptions,
 ): Promise<string> {
   const normalized = summary.trim()
   if (normalized.length <= maxCharacters) return normalized
@@ -101,6 +102,7 @@ async function compactSummary(
       toolChoice: 'none' as const,
       stopWhen: stepCountIs(1),
       temperature,
+      providerOptions,
     })
 
     let compacted = ''
@@ -262,12 +264,14 @@ async function runLibrarianInner(
     systemMessage.content = buildAnalyzeSystemPrompt({ disableDirections, disableSuggestions }).trim()
   }
 
+  const providerOptions = buildProviderOptions(story.settings.disableThinking ?? false)
   const agent = createToolAgent({
     model,
     instructions: systemMessage?.content || 'You are a helpful assistant.',
     tools: compiled.tools,
     maxSteps: 3,
     temperature,
+    providerOptions,
   })
 
   let fullText = ''
@@ -578,6 +582,7 @@ async function applyDeferredSummaries(
     summaryCompact.maxCharacters,
     summaryCompact.targetCharacters,
     requestLogger,
+    buildProviderOptions(currentStory.settings.disableThinking ?? false),
   )
 
   const updatedStory = {

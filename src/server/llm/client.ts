@@ -61,6 +61,17 @@ function getCachedProvider(id: string, baseURL: string, apiKey: string, name: st
   return provider
 }
 
+export type ProviderOptions = Record<string, Record<string, unknown>>
+
+/**
+ * Build providerOptions that suppress extended thinking / reasoning.
+ * Returns undefined when thinking should remain enabled.
+ */
+export function buildProviderOptions(disableThinking: boolean): ProviderOptions | undefined {
+  if (!disableThinking) return undefined
+  return { openaiCompatible: { reasoningEffort: 'none' } }
+}
+
 export interface ResolvedModel {
   model: LanguageModel
   providerId: string | null

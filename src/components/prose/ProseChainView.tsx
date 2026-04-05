@@ -224,6 +224,28 @@ export function ProseChainView({
     enabled: mentionsEnabled,
   })
 
+  const { data: analysisIndex } = useQuery({
+    queryKey: ['librarian-analysis-index', storyId],
+    queryFn: () => api.librarian.getAnalysisIndex(storyId),
+    refetchInterval: 10_000,
+  })
+
+  const analyzedFragments = useMemo(
+    () => new Set(Object.keys(analysisIndex ?? {})),
+    [analysisIndex],
+  )
+
+  const analyzeMutation = useMutation({
+    mutationFn: (fragmentId: string) => api.librarian.analyze(storyId, fragmentId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['librarian-analysis-index', storyId] })
+    },
+  })
+
+  const handleAnalyze = useCallback((fragmentId: string) => {
+    analyzeMutation.mutate(fragmentId)
+  }, [analyzeMutation])
+
   // Build media lookup for character portraits in hover cards
   const mediaById = useMemo(() => {
     const map = new Map<string, Fragment>()
@@ -545,6 +567,8 @@ export function ProseChainView({
                           onDebugLog={onDebugLog}
                           onBranchFrom={handleBranchFrom}
                           onAskLibrarian={onAskLibrarian}
+                          onAnalyze={handleAnalyze}
+                          hasAnalysis={analyzedFragments.has(fragment.id)}
                           quickSwitch={quickSwitch}
                           mentionsEnabled={mentionsEnabled}
                           mentionColors={mentionColors}
@@ -588,6 +612,8 @@ export function ProseChainView({
                           onDebugLog={onDebugLog}
                           onBranchFrom={handleBranchFrom}
                           onAskLibrarian={onAskLibrarian}
+                          onAnalyze={handleAnalyze}
+                          hasAnalysis={analyzedFragments.has(fragment.id)}
                           quickSwitch={quickSwitch}
                           mentionsEnabled={mentionsEnabled}
                           mentionColors={mentionColors}

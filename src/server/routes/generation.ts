@@ -14,7 +14,7 @@ import { buildContextState, createDefaultBlocks, compileBlocks, addCacheBreakpoi
 import { applyBlockConfig } from '../blocks/apply'
 import { createScriptHelpers } from '../blocks/script-context'
 import { createFragmentTools } from '../llm/tools'
-import { getModel } from '../llm/client'
+import { getModel, buildProviderOptions } from '../llm/client'
 import { createWriterAgent } from '../llm/writer-agent'
 import { runPrewriter, createWriterBriefBlocks } from '../llm/prewriter'
 import {
@@ -92,7 +92,10 @@ export function generationRoutes(dataDir: string) {
       }
 
       const mode = body.mode ?? 'generate'
-      const disableLibrarianAutoAnalysis = story.settings.disableLibrarianAutoAnalysis ?? false
+      const librarianConfig = await getAgentBlockConfig(dataDir, params.storyId, 'librarian.analyze')
+      const disableLibrarianAutoAnalysis = (story.settings.disableLibrarianAutoAnalysis ?? false) || (librarianConfig.disableAutoAnalysis ?? false)
+      const disableThinking = story.settings.disableThinking ?? false
+      const providerOptions = buildProviderOptions(disableThinking)
       const modeLabel = mode === 'regenerate'
         ? 'Regenerate'
         : mode === 'refine'
@@ -264,6 +267,7 @@ export function generationRoutes(dataDir: string) {
                   tools,
                   maxSteps: prewriterMaxSteps,
                   abortSignal: abortController.signal,
+                  providerOptions,
                   onEvent: (event) => {
                     if (event.type === 'text') {
                       emit({ type: 'prewriter-text', text: event.text })
@@ -312,6 +316,7 @@ export function generationRoutes(dataDir: string) {
               tools,
               maxSteps: writerMaxSteps,
               temperature,
+              providerOptions,
             })
             const result = await writerAgent.stream({
               messages: writerMessages,
@@ -412,7 +417,7 @@ export function generationRoutes(dataDir: string) {
               requestLogger.info('Tool calls extracted', { toolCallCount: toolCalls.length })
 
               // Run afterGeneration hooks
-              let genResult = await runAfterGeneration(enabledPlugins, {
+              const genResult = await runAfterGeneration(enabledPlugins, {
                 text: fullText,
                 fragmentId: (mode === 'regenerate' || mode === 'refine') ? body.fragmentId! : null,
                 toolCalls,
@@ -518,7 +523,8 @@ export function generationRoutes(dataDir: string) {
 
               // Capture finish reason, step count, and token usage
               const finishReason = lastFinishReason
-              const stepsExceeded = stepCount >= 10 && finishReason !== 'stop'
+              const configuredMaxStepsForLog = story.settings.maxSteps ?? 10
+              const stepsExceeded = stepCount >= configuredMaxStepsForLog && finishReason !== 'stop'
               let totalUsage: { inputTokens: number; outputTokens: number } | undefined
               try {
                 const rawUsage = await totalUsagePromise

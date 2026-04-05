@@ -10,7 +10,7 @@ import type { StoryMeta } from '../fragments/schema'
 import type { ContextBuildState } from '../llm/context-builder'
 import type { AgentBlockContext } from './agent-block-context'
 import type { AgentStreamResult } from './stream-types'
-import { getModel } from '../llm/client'
+import { getModel, buildProviderOptions } from '../llm/client'
 import { getStory } from '../fragments/storage'
 import { buildContextState } from '../llm/context-builder'
 import { createFragmentTools } from '../llm/tools'
@@ -130,6 +130,7 @@ export function createStreamingRunner<TOpts extends object, TValidated = Record<
 
       // 3. Resolve model early (modelId needed for instruction resolution)
       const { model, modelId, temperature } = await getModel(dataDir, storyId, { role })
+      const providerOptions = buildProviderOptions(story.settings.disableThinking ?? false)
       requestLogger.info('Resolved model', { modelId })
 
       // 4. Build story context (optional)
@@ -187,6 +188,7 @@ export function createStreamingRunner<TOpts extends object, TValidated = Record<
         maxSteps: maxSteps ?? defaultMaxSteps,
         toolChoice: config.toolChoice,
         temperature,
+        providerOptions,
       })
 
       // 10. Build messages

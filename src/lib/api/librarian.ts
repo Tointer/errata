@@ -12,6 +12,13 @@ import type {
 export const librarian = {
   getStatus: (storyId: string) =>
     apiFetch<LibrarianState>(`/stories/${storyId}/librarian/status`),
+  getAnalysisIndex: (storyId: string) =>
+    apiFetch<Record<string, string>>(`/stories/${storyId}/librarian/analysis-index`),
+  analyze: (storyId: string, fragmentId: string) =>
+    apiFetch<{ ok: boolean; fragmentId: string }>(`/stories/${storyId}/librarian/analyze`, {
+      method: 'POST',
+      body: JSON.stringify({ fragmentId }),
+    }),
   listAnalyses: (storyId: string) =>
     apiFetch<LibrarianAnalysisSummary[]>(`/stories/${storyId}/librarian/analyses`),
   listAgentRuns: (storyId: string) =>

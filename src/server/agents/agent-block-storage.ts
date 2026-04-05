@@ -8,6 +8,7 @@ import { writeJsonAtomic } from '../fs-utils'
 
 export const AgentBlockConfigSchema = BlockConfigSchema.extend({
   disabledTools: z.array(z.string()).default([]),
+  disableAutoAnalysis: z.boolean().default(false),
 })
 
 export type AgentBlockConfig = z.infer<typeof AgentBlockConfigSchema>
@@ -18,7 +19,7 @@ async function agentBlockConfigPath(dataDir: string, storyId: string, agentName:
 }
 
 function emptyConfig(): AgentBlockConfig {
-  return { customBlocks: [], overrides: {}, blockOrder: [], disabledTools: [] }
+  return { customBlocks: [], overrides: {}, blockOrder: [], disabledTools: [], disableAutoAnalysis: false }
 }
 
 export async function getAgentBlockConfig(dataDir: string, storyId: string, agentName: string): Promise<AgentBlockConfig> {

@@ -210,6 +210,19 @@ export async function rebuildAnalysisIndex(
   return rebuilt
 }
 
+export async function clearAnalysisIndexEntry(
+  dataDir: string,
+  storyId: string,
+  fragmentId: string,
+): Promise<void> {
+  const index = await getAnalysisIndex(dataDir, storyId)
+  if (!index) return
+  if (!(fragmentId in index.latestByFragmentId)) return
+  delete index.latestByFragmentId[fragmentId]
+  index.updatedAt = new Date().toISOString()
+  await saveAnalysisIndex(dataDir, storyId, index)
+}
+
 export async function getLatestAnalysisIdsByFragment(
   dataDir: string,
   storyId: string,

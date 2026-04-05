@@ -30,6 +30,7 @@ export interface StoryMeta {
     guidedContinuePrompt?: string
     guidedSceneSettingPrompt?: string
     guidedSuggestPrompt?: string
+    disableThinking?: boolean
   }
 }
 
@@ -339,6 +340,7 @@ export interface AgentBlockInfo {
 
 export interface AgentBlockConfig extends BlockConfig {
   disabledTools: string[]
+  disableAutoAnalysis?: boolean
 }
 
 export interface AgentBlocksResponse {

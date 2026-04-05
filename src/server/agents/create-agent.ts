@@ -1,4 +1,4 @@
-import { ToolLoopAgent, stepCountIs, type LanguageModel, type ToolSet } from 'ai'
+import { ToolLoopAgent, stepCountIs, type LanguageModel, type ToolSet, type ProviderOptions } from 'ai'
 
 export function createToolAgent(args: {
   model: LanguageModel
@@ -7,6 +7,7 @@ export function createToolAgent(args: {
   maxSteps?: number
   toolChoice?: 'auto' | 'none'
   temperature?: number
+  providerOptions?: ProviderOptions
 }): ToolLoopAgent {
   return new ToolLoopAgent({
     model: args.model,
@@ -15,5 +16,6 @@ export function createToolAgent(args: {
     toolChoice: args.toolChoice ?? 'auto',
     stopWhen: stepCountIs(args.maxSteps ?? 3),
     temperature: args.temperature,
+    providerOptions: args.providerOptions,
   })
 }

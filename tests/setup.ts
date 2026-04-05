@@ -21,6 +21,7 @@ export function makeTestSettings(overrides?: Partial<StorySettings>): StorySetti
     autoApplyLibrarianSuggestions: false,
     disableLibrarianDirections: false,
     disableLibrarianSuggestions: false,
+    disableThinking: false,
     contextOrderMode: 'simple',
     fragmentOrder: [],
     contextCompact: { type: 'proseLimit', value: 10 },

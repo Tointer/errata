@@ -53,6 +53,7 @@ export const agentBlocks = {
     overrides?: Record<string, BlockOverride>
     blockOrder?: string[]
     disabledTools?: string[]
+    disableAutoAnalysis?: boolean
   }) =>
     apiFetch<AgentBlockConfig>(`/stories/${storyId}/agent-blocks/${agentName}/config`, {
       method: 'PATCH',

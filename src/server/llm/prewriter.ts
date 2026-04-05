@@ -1,4 +1,4 @@
-import { tool, ToolLoopAgent, stepCountIs, type ToolSet } from 'ai'
+import { tool, ToolLoopAgent, stepCountIs, type ToolSet, type ProviderOptions } from 'ai'
 import { z } from 'zod/v4'
 import { getModel } from './client'
 import { compileBlocks, expandMessagesFragmentTags, type ContextBlock, type ContextMessage } from './context-builder'
@@ -85,6 +85,7 @@ export interface RunPrewriterArgs {
   maxSteps?: number
   abortSignal?: AbortSignal
   onEvent?: (event: PrewriterEvent) => void
+  providerOptions?: ProviderOptions
 }
 
 export interface PrewriterResult {
@@ -105,7 +106,7 @@ export interface PrewriterResult {
  * that the writer will use instead of the full context.
  */
 export async function runPrewriter(args: RunPrewriterArgs): Promise<PrewriterResult> {
-  const { dataDir, storyId, compiledMessages, authorInput, mode, tools, maxSteps = 3, abortSignal, onEvent } = args
+  const { dataDir, storyId, compiledMessages, authorInput, mode, tools, maxSteps = 3, abortSignal, onEvent, providerOptions } = args
   const requestLogger = logger.child({ storyId })
 
   const startTime = Date.now()
@@ -189,6 +190,7 @@ export async function runPrewriter(args: RunPrewriterArgs): Promise<PrewriterRes
     toolChoice: 'auto',
     stopWhen: stepCountIs(maxSteps),
     temperature,
+    providerOptions,
   })
 
   let fullText = ''

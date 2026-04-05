@@ -295,7 +295,7 @@ function AgentBlockEditor({ storyId, agentName, agents, onBack }: AgentBlockEdit
   })
 
   const configMutation = useMutation({
-    mutationFn: (params: { overrides?: Record<string, BlockOverride>; blockOrder?: string[]; disabledTools?: string[] }) =>
+    mutationFn: (params: { overrides?: Record<string, BlockOverride>; blockOrder?: string[]; disabledTools?: string[]; disableAutoAnalysis?: boolean }) =>
       api.agentBlocks.updateConfig(storyId, agentName, params),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['agent-blocks', storyId, agentName] })
@@ -668,6 +668,27 @@ function AgentBlockEditor({ storyId, agentName, agents, onBack }: AgentBlockEdit
               </div>
             )
           })()}
+
+          {/* Agent-specific settings */}
+          {agentName === 'librarian.analyze' && (
+            <div className="rounded-lg border border-border/30 px-3 py-2.5 flex items-center justify-between">
+              <div>
+                <p className="text-[0.75rem] font-medium text-foreground/80">Disable post-generation analysis</p>
+                <p className="text-[0.5625rem] text-muted-foreground leading-snug mt-0.5">Prevent the librarian from running automatically after prose is generated</p>
+              </div>
+              <button
+                className={cn(
+                  'shrink-0 size-[16px] rounded-full border-[1.5px] flex items-center justify-center transition-all duration-200',
+                  data?.config.disableAutoAnalysis
+                    ? 'border-emerald-500/80 bg-emerald-500 text-white shadow-[0_0_4px_rgba(16,185,129,0.15)]'
+                    : 'border-muted-foreground/30 bg-transparent hover:border-muted-foreground/50',
+                )}
+                onClick={() => configMutation.mutate({ disableAutoAnalysis: !data?.config.disableAutoAnalysis })}
+              >
+                {data?.config.disableAutoAnalysis && <Check className="size-2" strokeWidth={3} />}
+              </button>
+            </div>
+          )}
 
           {/* Tool toggles section */}
           {availableTools.length > 0 && (

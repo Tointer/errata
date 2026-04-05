@@ -23,6 +23,7 @@ import {
 import { generateFragmentId } from '@/lib/fragment-ids'
 import { registry } from '../fragments/registry'
 import { triggerLibrarian } from '../librarian/scheduler'
+import { clearAnalysisIndexEntry } from '../librarian/storage'
 import { createLogger } from '../logging'
 import type { Fragment } from '../fragments/schema'
 
@@ -140,6 +141,7 @@ export function fragmentRoutes(dataDir: string) {
       await updateFragment(dataDir, params.storyId, updated)
 
       if (existing.type === 'prose' && hasMaterialProseChange(existing, updated)) {
+        clearAnalysisIndexEntry(dataDir, params.storyId, updated.id).catch(() => {})
         Promise.resolve(triggerLibrarian(dataDir, params.storyId, updated)).catch((err) => {
           requestLogger.error('triggerLibrarian failed after prose update', {
             error: err instanceof Error ? err.message : String(err),
@@ -186,6 +188,7 @@ export function fragmentRoutes(dataDir: string) {
       }
 
       if (existing.type === 'prose' && hasMaterialProseChange(existing, updated)) {
+        clearAnalysisIndexEntry(dataDir, params.storyId, updated.id).catch(() => {})
         Promise.resolve(triggerLibrarian(dataDir, params.storyId, updated)).catch((err) => {
           requestLogger.error('triggerLibrarian failed after prose edit', {
             error: err instanceof Error ? err.message : String(err),

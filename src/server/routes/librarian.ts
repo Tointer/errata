@@ -4,7 +4,7 @@ import {
   getGenerationLog,
   listGenerationLogs,
 } from '../llm/generation-logs'
-import { getLibrarianRuntimeStatus } from '../librarian/scheduler'
+import { getLibrarianRuntimeStatus, triggerLibrarian } from '../librarian/scheduler'
 import { createSSEStream } from '../librarian/analysis-stream'
 import { createAgentInstance, listAgentRuns } from '../agents'
 import {
@@ -20,6 +20,7 @@ import {
   deleteConversation,
   getConversationHistory,
   saveConversationHistory,
+  getLatestAnalysisIdsByFragment,
 } from '../librarian/storage'
 import { applyFragmentSuggestion } from '../librarian/suggestions'
 import { createLogger } from '../logging'
@@ -52,6 +53,33 @@ export function librarianRoutes(dataDir: string) {
         ...runtime,
       }
     }, { detail: { summary: 'Get librarian status' } })
+
+    .get('/stories/:storyId/librarian/analysis-index', async ({ params }) => {
+      const index = await getLatestAnalysisIdsByFragment(dataDir, params.storyId)
+      return Object.fromEntries(index)
+    }, { detail: { summary: 'Get fragment → analysis ID mapping' } })
+
+    .post('/stories/:storyId/librarian/analyze', async ({ params, body, set }) => {
+      const story = await getStory(dataDir, params.storyId)
+      if (!story) {
+        set.status = 404
+        return { error: 'Story not found' }
+      }
+      const { fragmentId } = body as { fragmentId: string }
+      if (!fragmentId) {
+        set.status = 422
+        return { error: 'fragmentId is required' }
+      }
+      const fragment = await getFragment(dataDir, params.storyId, fragmentId)
+      if (!fragment) {
+        set.status = 404
+        return { error: 'Fragment not found' }
+      }
+      triggerLibrarian(dataDir, params.storyId, fragment).catch((err) => {
+        logger.error('Manual librarian trigger failed', { error: err instanceof Error ? err.message : String(err) })
+      })
+      return { ok: true, fragmentId }
+    }, { detail: { summary: 'Trigger librarian analysis on a specific fragment' } })
 
     .get('/stories/:storyId/librarian/analysis-stream', async ({ params, set }) => {
       const stream = createSSEStream(params.storyId)

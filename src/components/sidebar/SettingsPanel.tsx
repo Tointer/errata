@@ -88,6 +88,20 @@ function SettingRow({ label, description, helpTopic, children }: { label: string
   )
 }
 
+function SettingsGroup({ title, description, children }: { title: string; description?: string; children: React.ReactNode }) {
+  return (
+    <div className="rounded-lg border border-border/30 overflow-hidden">
+      <div className="px-3 py-2 border-b border-border/20 bg-muted/20">
+        <p className="text-[0.625rem] uppercase tracking-[0.14em] text-muted-foreground">{title}</p>
+        {description && <p className="text-[0.6875rem] text-muted-foreground mt-0.5 leading-snug">{description}</p>}
+      </div>
+      <div className="divide-y divide-border/20">
+        {children}
+      </div>
+    </div>
+  )
+}
+
 function NumberStepper({ value, min, max, onChange, disabled, suffix, wide }: {
   value: number; min: number; max: number; onChange: (v: number) => void; disabled?: boolean; suffix?: string; wide?: boolean
 }) {
@@ -628,185 +642,203 @@ export function SettingsPanel({
             <CircleHelp className="size-3" />
           </button>
         </div>
-        <div className="rounded-lg border border-border/30 divide-y divide-border/20">
-          <SettingRow label="Output format" helpTopic="generation#output-format">
-            <SegmentedControl
-              value={story.settings.outputFormat}
-              options={[
-                { value: 'plaintext', label: 'Plain' },
-                { value: 'markdown', label: 'Markdown' },
-              ]}
-              onChange={(v) => updateMutation.mutate({ outputFormat: v })}
-              disabled={updateMutation.isPending}
-            />
-          </SettingRow>
-          <SettingRow label="Prompt control" description="Advanced mode enables Agent configuration and fragment ordering" helpTopic="settings#prompt-control">
-            <SegmentedControl
-              value={story.settings.contextOrderMode ?? 'simple'}
-              options={[
-                { value: 'simple', label: 'Simple' },
-                { value: 'advanced', label: 'Advanced' },
-              ]}
-              onChange={(v) => updateMutation.mutate({ contextOrderMode: v })}
-              disabled={updateMutation.isPending}
-            />
-          </SettingRow>
-          <SettingRow label="Summarization" description="Positions back before summarizing" helpTopic="generation#summarization">
-            <NumberStepper
-              value={story.settings.summarizationThreshold ?? 4}
-              min={0}
-              max={20}
-              onChange={(v) => updateMutation.mutate({ summarizationThreshold: v })}
-              disabled={updateMutation.isPending}
-            />
-          </SettingRow>
-          <div className="px-3 py-2.5 border-t border-border/20">
-            <p className="text-[0.75rem] font-medium text-foreground/80">Summary compaction</p>
-            <p className="text-[0.625rem] text-muted-foreground mt-0.5 leading-snug">Keeps rolling summary bounded as stories grow</p>
-
-            <div className="mt-2.5 space-y-2.5">
-              <div className="flex items-center justify-between gap-2">
-                <span className="text-[0.6875rem] text-muted-foreground">Max characters</span>
-                <NumberStepper
-                  value={summaryCompact.maxCharacters}
-                  min={100}
-                  max={100000}
-                  onChange={(v) => {
-                    const nextMax = Math.max(100, v)
-                    updateMutation.mutate({
-                      summaryCompact: {
-                        maxCharacters: nextMax,
-                        targetCharacters: Math.min(summaryCompact.targetCharacters, nextMax),
-                      },
-                    })
-                  }}
-                  disabled={updateMutation.isPending}
-                  wide
-                />
-              </div>
-
-              <div className="flex items-center justify-between gap-2">
-                <span className="text-[0.6875rem] text-muted-foreground">Target characters</span>
-                <NumberStepper
-                  value={summaryCompact.targetCharacters}
-                  min={100}
-                  max={summaryCompact.maxCharacters}
-                  onChange={(v) => {
-                    updateMutation.mutate({
-                      summaryCompact: {
-                        maxCharacters: summaryCompact.maxCharacters,
-                        targetCharacters: Math.min(Math.max(100, v), summaryCompact.maxCharacters),
-                      },
-                    })
-                  }}
-                  disabled={updateMutation.isPending}
-                  wide
-                />
-              </div>
-            </div>
-          </div>
-          <SettingRow
-            label="Hierarchical summaries"
-            description="Include chapter marker summaries with rolling story summary"
-            helpTopic="generation#hierarchical-summaries"
-          >
-            <ToggleSwitch
-              on={story.settings.enableHierarchicalSummary ?? false}
-              onToggle={() => updateMutation.mutate({ enableHierarchicalSummary: !(story.settings.enableHierarchicalSummary ?? false) })}
-              disabled={updateMutation.isPending}
-              label="Toggle hierarchical summaries"
-            />
-          </SettingRow>
-          {/* Context limit — stacked layout for breathing room */}
-          <div className="px-3 py-2.5">
-            <div className="flex items-center gap-1">
-              <p className="text-[0.75rem] font-medium text-foreground/80">Context limit</p>
-              <button
-                type="button"
-                onClick={(e) => { e.stopPropagation(); openHelp('generation#context-limit') }}
-                className="text-muted-foreground hover:text-primary/60 transition-colors"
-                title="Learn more"
-              >
-                <CircleHelp className="size-3" />
-              </button>
-            </div>
-            <p className="text-[0.625rem] text-muted-foreground mt-0.5 leading-snug">How much recent prose to include</p>
-            <div className="flex items-center justify-between gap-2 mt-2.5">
+        <div className="space-y-3">
+          <SettingsGroup title="Workflow" description="How prose generation runs and what the model is allowed to do.">
+            <SettingRow label="Generation mode" description="How prose generation is handled">
               <SegmentedControl
-                value={(story.settings.contextCompact?.type ?? 'proseLimit') as 'proseLimit' | 'maxTokens' | 'maxCharacters'}
+                value={(story.settings.generationMode ?? 'standard') as 'standard' | 'prewriter'}
                 options={[
-                  { value: 'proseLimit' as const, label: 'Fragments' },
-                  { value: 'maxTokens' as const, label: 'Tokens' },
-                  { value: 'maxCharacters' as const, label: 'Characters' },
+                  { value: 'standard' as const, label: 'Standard' },
+                  { value: 'prewriter' as const, label: 'Prewriter' },
                 ]}
-                onChange={(v) => {
-                  const defaults = { proseLimit: 10, maxTokens: 40000, maxCharacters: 160000 } as const
-                  updateMutation.mutate({ contextCompact: { type: v, value: defaults[v] } })
-                }}
+                onChange={(v) => updateMutation.mutate({ generationMode: v })}
                 disabled={updateMutation.isPending}
               />
+            </SettingRow>
+            <SettingRow label="Output format" helpTopic="generation#output-format">
+              <SegmentedControl
+                value={story.settings.outputFormat}
+                options={[
+                  { value: 'plaintext', label: 'Plain' },
+                  { value: 'markdown', label: 'Markdown' },
+                ]}
+                onChange={(v) => updateMutation.mutate({ outputFormat: v })}
+                disabled={updateMutation.isPending}
+              />
+            </SettingRow>
+            <SettingRow label="Max steps" description="Tool-use rounds per generation" helpTopic="generation#max-steps">
               <NumberStepper
-                value={story.settings.contextCompact?.value ?? 10}
-                min={(story.settings.contextCompact?.type ?? 'proseLimit') === 'proseLimit' ? 1 : (story.settings.contextCompact?.type ?? 'proseLimit') === 'maxTokens' ? 100 : 500}
-                max={(story.settings.contextCompact?.type ?? 'proseLimit') === 'proseLimit' ? 100 : (story.settings.contextCompact?.type ?? 'proseLimit') === 'maxTokens' ? 100000 : 500000}
-                onChange={(v) => updateMutation.mutate({ contextCompact: { type: story.settings.contextCompact?.type ?? 'proseLimit', value: v } })}
+                value={story.settings.maxSteps ?? 10}
+                min={1}
+                max={50}
+                onChange={(v) => updateMutation.mutate({ maxSteps: v })}
                 disabled={updateMutation.isPending}
-                wide={(story.settings.contextCompact?.type ?? 'proseLimit') !== 'proseLimit'}
               />
+            </SettingRow>
+            <SettingRow label="Disable thinking" description="Suppress extended thinking / reasoning mode on models that support it">
+              <ToggleSwitch
+                on={story.settings.disableThinking ?? false}
+                onToggle={() => updateMutation.mutate({ disableThinking: !(story.settings.disableThinking ?? false) })}
+                disabled={updateMutation.isPending}
+                label="Toggle disable thinking"
+              />
+            </SettingRow>
+          </SettingsGroup>
+
+          <SettingsGroup title="Context" description="How the prompt is assembled before generation starts.">
+            <SettingRow label="Prompt control" description="Advanced mode enables Agent configuration and fragment ordering" helpTopic="settings#prompt-control">
+              <SegmentedControl
+                value={story.settings.contextOrderMode ?? 'simple'}
+                options={[
+                  { value: 'simple', label: 'Simple' },
+                  { value: 'advanced', label: 'Advanced' },
+                ]}
+                onChange={(v) => updateMutation.mutate({ contextOrderMode: v })}
+                disabled={updateMutation.isPending}
+              />
+            </SettingRow>
+            <div className="px-3 py-2.5">
+              <div className="flex items-center gap-1">
+                <p className="text-[0.75rem] font-medium text-foreground/80">Context limit</p>
+                <button
+                  type="button"
+                  onClick={(e) => { e.stopPropagation(); openHelp('generation#context-limit') }}
+                  className="text-muted-foreground hover:text-primary/60 transition-colors"
+                  title="Learn more"
+                >
+                  <CircleHelp className="size-3" />
+                </button>
+              </div>
+              <p className="text-[0.625rem] text-muted-foreground mt-0.5 leading-snug">How much recent prose to include</p>
+              <div className="flex items-center justify-between gap-2 mt-2.5">
+                <SegmentedControl
+                  value={(story.settings.contextCompact?.type ?? 'proseLimit') as 'proseLimit' | 'maxTokens' | 'maxCharacters'}
+                  options={[
+                    { value: 'proseLimit' as const, label: 'Fragments' },
+                    { value: 'maxTokens' as const, label: 'Tokens' },
+                    { value: 'maxCharacters' as const, label: 'Characters' },
+                  ]}
+                  onChange={(v) => {
+                    const defaults = { proseLimit: 10, maxTokens: 40000, maxCharacters: 160000 } as const
+                    updateMutation.mutate({ contextCompact: { type: v, value: defaults[v] } })
+                  }}
+                  disabled={updateMutation.isPending}
+                />
+                <NumberStepper
+                  value={story.settings.contextCompact?.value ?? 10}
+                  min={(story.settings.contextCompact?.type ?? 'proseLimit') === 'proseLimit' ? 1 : (story.settings.contextCompact?.type ?? 'proseLimit') === 'maxTokens' ? 100 : 500}
+                  max={(story.settings.contextCompact?.type ?? 'proseLimit') === 'proseLimit' ? 100 : (story.settings.contextCompact?.type ?? 'proseLimit') === 'maxTokens' ? 100000 : 500000}
+                  onChange={(v) => updateMutation.mutate({ contextCompact: { type: story.settings.contextCompact?.type ?? 'proseLimit', value: v } })}
+                  disabled={updateMutation.isPending}
+                  wide={(story.settings.contextCompact?.type ?? 'proseLimit') !== 'proseLimit'}
+                />
+              </div>
             </div>
-          </div>
-          <SettingRow label="Auto-apply suggestions" description="Librarian auto creates and updates suggested fragments" helpTopic="librarian#auto-suggestions">
-            <ToggleSwitch
-              on={story.settings.autoApplyLibrarianSuggestions ?? false}
-              onToggle={() => updateMutation.mutate({ autoApplyLibrarianSuggestions: !(story.settings.autoApplyLibrarianSuggestions ?? false) })}
-              disabled={updateMutation.isPending}
-              label="Toggle auto-apply suggestions"
-            />
-          </SettingRow>
-          <SettingRow label="Disable auto analysis" description="Do not run the librarian automatically after prose generation">
-            <ToggleSwitch
-              on={story.settings.disableLibrarianAutoAnalysis ?? false}
-              onToggle={() => updateMutation.mutate({ disableLibrarianAutoAnalysis: !(story.settings.disableLibrarianAutoAnalysis ?? false) })}
-              disabled={updateMutation.isPending}
-              label="Toggle disable auto analysis"
-            />
-          </SettingRow>
-          <SettingRow label="Disable directions" description="Skip story direction suggestions during analysis">
-            <ToggleSwitch
-              on={story.settings.disableLibrarianDirections ?? false}
-              onToggle={() => updateMutation.mutate({ disableLibrarianDirections: !(story.settings.disableLibrarianDirections ?? false) })}
-              disabled={updateMutation.isPending}
-              label="Toggle disable directions"
-            />
-          </SettingRow>
-          <SettingRow label="Disable suggestions" description="Skip fragment create/update suggestions during analysis">
-            <ToggleSwitch
-              on={story.settings.disableLibrarianSuggestions ?? false}
-              onToggle={() => updateMutation.mutate({ disableLibrarianSuggestions: !(story.settings.disableLibrarianSuggestions ?? false) })}
-              disabled={updateMutation.isPending}
-              label="Toggle disable suggestions"
-            />
-          </SettingRow>
-          <SettingRow label="Max steps" description="Tool-use rounds per generation" helpTopic="generation#max-steps">
-            <NumberStepper
-              value={story.settings.maxSteps ?? 10}
-              min={1}
-              max={50}
-              onChange={(v) => updateMutation.mutate({ maxSteps: v })}
-              disabled={updateMutation.isPending}
-            />
-          </SettingRow>
-          <SettingRow label="Generation mode" description="How prose generation is handled">
-            <SegmentedControl
-              value={(story.settings.generationMode ?? 'standard') as 'standard' | 'prewriter'}
-              options={[
-                { value: 'standard' as const, label: 'Standard' },
-                { value: 'prewriter' as const, label: 'Prewriter' },
-              ]}
-              onChange={(v) => updateMutation.mutate({ generationMode: v })}
-              disabled={updateMutation.isPending}
-            />
-          </SettingRow>
+          </SettingsGroup>
+
+          <SettingsGroup title="Memory" description="How story state is summarized and carried forward over time.">
+            <SettingRow label="Summarization" description="Positions back before summarizing" helpTopic="generation#summarization">
+              <NumberStepper
+                value={story.settings.summarizationThreshold ?? 4}
+                min={0}
+                max={20}
+                onChange={(v) => updateMutation.mutate({ summarizationThreshold: v })}
+                disabled={updateMutation.isPending}
+              />
+            </SettingRow>
+            <div className="px-3 py-2.5">
+              <p className="text-[0.75rem] font-medium text-foreground/80">Summary compaction</p>
+              <p className="text-[0.625rem] text-muted-foreground mt-0.5 leading-snug">Keeps rolling summary bounded as stories grow</p>
+
+              <div className="mt-2.5 space-y-2.5">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-[0.6875rem] text-muted-foreground">Max characters</span>
+                  <NumberStepper
+                    value={summaryCompact.maxCharacters}
+                    min={100}
+                    max={100000}
+                    onChange={(v) => {
+                      const nextMax = Math.max(100, v)
+                      updateMutation.mutate({
+                        summaryCompact: {
+                          maxCharacters: nextMax,
+                          targetCharacters: Math.min(summaryCompact.targetCharacters, nextMax),
+                        },
+                      })
+                    }}
+                    disabled={updateMutation.isPending}
+                    wide
+                  />
+                </div>
+
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-[0.6875rem] text-muted-foreground">Target characters</span>
+                  <NumberStepper
+                    value={summaryCompact.targetCharacters}
+                    min={100}
+                    max={summaryCompact.maxCharacters}
+                    onChange={(v) => {
+                      updateMutation.mutate({
+                        summaryCompact: {
+                          maxCharacters: summaryCompact.maxCharacters,
+                          targetCharacters: Math.min(Math.max(100, v), summaryCompact.maxCharacters),
+                        },
+                      })
+                    }}
+                    disabled={updateMutation.isPending}
+                    wide
+                  />
+                </div>
+              </div>
+            </div>
+            <SettingRow
+              label="Hierarchical summaries"
+              description="Include chapter marker summaries with rolling story summary"
+              helpTopic="generation#hierarchical-summaries"
+            >
+              <ToggleSwitch
+                on={story.settings.enableHierarchicalSummary ?? false}
+                onToggle={() => updateMutation.mutate({ enableHierarchicalSummary: !(story.settings.enableHierarchicalSummary ?? false) })}
+                disabled={updateMutation.isPending}
+                label="Toggle hierarchical summaries"
+              />
+            </SettingRow>
+          </SettingsGroup>
+
+          <SettingsGroup title="Librarian" description="What happens after prose is generated and the librarian follows up.">
+            <SettingRow label="Disable auto analysis" description="Do not run the librarian automatically after prose generation">
+              <ToggleSwitch
+                on={story.settings.disableLibrarianAutoAnalysis ?? false}
+                onToggle={() => updateMutation.mutate({ disableLibrarianAutoAnalysis: !(story.settings.disableLibrarianAutoAnalysis ?? false) })}
+                disabled={updateMutation.isPending}
+                label="Toggle disable auto analysis"
+              />
+            </SettingRow>
+            <SettingRow label="Auto-apply suggestions" description="Librarian auto creates and updates suggested fragments" helpTopic="librarian#auto-suggestions">
+              <ToggleSwitch
+                on={story.settings.autoApplyLibrarianSuggestions ?? false}
+                onToggle={() => updateMutation.mutate({ autoApplyLibrarianSuggestions: !(story.settings.autoApplyLibrarianSuggestions ?? false) })}
+                disabled={updateMutation.isPending}
+                label="Toggle auto-apply suggestions"
+              />
+            </SettingRow>
+            <SettingRow label="Disable directions" description="Skip story direction suggestions during analysis">
+              <ToggleSwitch
+                on={story.settings.disableLibrarianDirections ?? false}
+                onToggle={() => updateMutation.mutate({ disableLibrarianDirections: !(story.settings.disableLibrarianDirections ?? false) })}
+                disabled={updateMutation.isPending}
+                label="Toggle disable directions"
+              />
+            </SettingRow>
+            <SettingRow label="Disable suggestions" description="Skip fragment create/update suggestions during analysis">
+              <ToggleSwitch
+                on={story.settings.disableLibrarianSuggestions ?? false}
+                onToggle={() => updateMutation.mutate({ disableLibrarianSuggestions: !(story.settings.disableLibrarianSuggestions ?? false) })}
+                disabled={updateMutation.isPending}
+                label="Toggle disable suggestions"
+              />
+            </SettingRow>
+          </SettingsGroup>
         </div>
       </div>
 

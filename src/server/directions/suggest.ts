@@ -1,5 +1,5 @@
 import { ToolLoopAgent, stepCountIs } from 'ai'
-import { getModel } from '../llm/client'
+import { getModel, buildProviderOptions } from '../llm/client'
 import { getStory, getFragment } from '../fragments/storage'
 import { buildContextState } from '../llm/context-builder'
 import { compileAgentContext } from '../agents/compile-agent-context'
@@ -82,6 +82,7 @@ export async function suggestDirections(
 
   requestLogger.info('Generating suggestions', { modelId, count })
 
+  const providerOptions = buildProviderOptions(story?.settings.disableThinking ?? false)
   const agent = new ToolLoopAgent({
     model,
     instructions: systemMsg?.content || instructionRegistry.resolve('directions.system', modelId),
@@ -89,6 +90,7 @@ export async function suggestDirections(
     toolChoice: 'none' as const,
     stopWhen: stepCountIs(1),
     temperature,
+    providerOptions,
   })
 
   const startTime = Date.now()

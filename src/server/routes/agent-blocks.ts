@@ -257,10 +257,11 @@ export function agentBlockRoutes(dataDir: string) {
         return { error: `Agent block definition not found: ${params.agentName}` }
       }
 
-      const { overrides, blockOrder, disabledTools } = body as {
+      const { overrides, blockOrder, disabledTools, disableAutoAnalysis } = body as {
         overrides?: Record<string, unknown>
         blockOrder?: string[]
         disabledTools?: string[]
+        disableAutoAnalysis?: boolean
       }
 
       // Apply overrides/blockOrder if provided
@@ -277,6 +278,13 @@ export function agentBlockRoutes(dataDir: string) {
       // Apply disabledTools if provided
       if (disabledTools !== undefined) {
         await updateAgentDisabledTools(dataDir, params.storyId, params.agentName, disabledTools)
+      }
+
+      // Apply disableAutoAnalysis if provided
+      if (disableAutoAnalysis !== undefined) {
+        const current = await getAgentBlockConfig(dataDir, params.storyId, params.agentName)
+        current.disableAutoAnalysis = disableAutoAnalysis
+        await saveAgentBlockConfig(dataDir, params.storyId, params.agentName, current)
       }
 
       // Return latest config

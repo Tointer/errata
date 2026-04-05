@@ -39,6 +39,7 @@ export function storyRoutes(dataDir: string) {
           autoApplyLibrarianSuggestions: false,
           disableLibrarianDirections: false,
           disableLibrarianSuggestions: false,
+          disableThinking: false,
           contextOrderMode: 'simple' as const,
           fragmentOrder: [],
           contextCompact: { type: 'proseLimit' as const, value: 10 },
@@ -167,6 +168,7 @@ export function storyRoutes(dataDir: string) {
           ...(body.guidedContinuePrompt !== undefined ? { guidedContinuePrompt: body.guidedContinuePrompt } : {}),
           ...(body.guidedSceneSettingPrompt !== undefined ? { guidedSceneSettingPrompt: body.guidedSceneSettingPrompt } : {}),
           ...(body.guidedSuggestPrompt !== undefined ? { guidedSuggestPrompt: body.guidedSuggestPrompt } : {}),
+          ...(body.disableThinking !== undefined ? { disableThinking: body.disableThinking } : {}),
         },
         updatedAt: new Date().toISOString(),
       }
@@ -205,6 +207,7 @@ export function storyRoutes(dataDir: string) {
         guidedContinuePrompt: t.Optional(t.String()),
         guidedSceneSettingPrompt: t.Optional(t.String()),
         guidedSuggestPrompt: t.Optional(t.String()),
+        disableThinking: t.Optional(t.Boolean()),
       }),
       detail: { summary: 'Update story settings' },
     })

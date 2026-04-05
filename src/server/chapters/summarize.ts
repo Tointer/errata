@@ -1,6 +1,6 @@
 import { ToolLoopAgent, stepCountIs } from 'ai'
-import { getModel } from '../llm/client'
-import { getFragment, updateFragment } from '../fragments/storage'
+import { getModel, buildProviderOptions } from '../llm/client'
+import { getStory, getFragment, updateFragment } from '../fragments/storage'
 import { getFullProseChain } from '../fragments/prose-chain'
 import { instructionRegistry } from '../instructions'
 import { createLogger } from '../logging'
@@ -72,6 +72,9 @@ export async function summarizeChapter(
   const { model, modelId, temperature } = await getModel(dataDir, storyId, { role: 'librarian' })
   requestLogger.info('Resolved model', { modelId })
 
+  const story = await getStory(dataDir, storyId)
+  const providerOptions = buildProviderOptions(story?.settings.disableThinking ?? false)
+
   const agent = new ToolLoopAgent({
     model,
     instructions: instructionRegistry.resolve('chapters.summarize.system', modelId),
@@ -79,6 +82,7 @@ export async function summarizeChapter(
     toolChoice: 'none' as const,
     stopWhen: stepCountIs(1),
     temperature,
+    providerOptions,
   })
 
   const startTime = Date.now()

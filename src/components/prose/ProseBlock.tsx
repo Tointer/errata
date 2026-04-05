@@ -7,7 +7,7 @@ import { ChevronRail } from './ChevronRail'
 import { GenerationThoughts } from './GenerationThoughts'
 import { type ThoughtStep } from './InlineGenerationInput'
 import { buildAnnotationHighlighter, formatDialogue, composeTextTransforms, stripEmphasisInDialogue, type Annotation } from '@/lib/character-mentions'
-import { RefreshCw, Undo2, PenLine, Bug, Trash2, GitBranch, MessageSquare, ChevronLeft, ChevronRight, Info } from 'lucide-react'
+import { RefreshCw, Undo2, PenLine, Bug, Trash2, GitBranch, MessageSquare, ChevronLeft, ChevronRight, Info, BookOpen } from 'lucide-react'
 
 interface ProseBlockProps {
   storyId: string
@@ -22,6 +22,8 @@ interface ProseBlockProps {
   onBranchFrom?: (sectionIndex: number) => void
   onEdit?: (fragmentId: string, selectedText?: string) => void
   onAskLibrarian?: (fragmentId: string, prefill?: string) => void
+  onAnalyze?: (fragmentId: string) => void
+  hasAnalysis?: boolean
   quickSwitch: boolean
   mentionsEnabled?: boolean
   mentionColors?: Map<string, string>
@@ -100,6 +102,8 @@ export const ProseBlock = memo(function ProseBlock({
   onDebugLog,
   onBranchFrom,
   onAskLibrarian,
+  onAnalyze,
+  hasAnalysis,
   quickSwitch,
   mentionsEnabled,
   mentionColors,
@@ -411,6 +415,13 @@ export const ProseBlock = memo(function ProseBlock({
 
   return (
     <div ref={blockRef} className="group relative mb-6" data-prose-index={displayIndex} data-component-id={`prose-${fragment.id}-block`}>
+      {/* Analyzed indicator — subtle dot in the top-right corner */}
+      {hasAnalysis && (
+        <div className="absolute -top-1 -right-1 z-[1]" title="Analyzed by librarian">
+          <div className="size-2 rounded-full bg-emerald-500/70 shadow-[0_0_4px_rgba(16,185,129,0.3)]" />
+        </div>
+      )}
+
       {/* User prompt header — left-aligned accent bar, display font, inline editable */}
       {fragment.description && (
         <div className="mb-3 -mt-2">
@@ -721,6 +732,16 @@ export const ProseBlock = memo(function ProseBlock({
                       Ask
                     </button>
                   </>
+                )}
+                {onAnalyze && (
+                  <button
+                    className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[0.6875rem] text-muted-foreground hover:text-foreground hover:bg-accent/60 transition-all"
+                    onClick={() => { onAnalyze(fragment.id); setShowActions(false) }}
+                    data-component-id={`prose-${fragment.id}-analyze`}
+                  >
+                    <BookOpen className="size-3.5" />
+                    Analyze
+                  </button>
                 )}
               </div>
             </div>
