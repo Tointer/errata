@@ -7,6 +7,9 @@ import { getContentRoot, initBranches } from './branches'
 import { createLogger } from '../logging'
 import { writeJsonAtomic } from '../fs-utils'
 import {
+  loadMarkdownFragmentById,
+  loadMarkdownStoryMeta,
+  listMarkdownFragments,
   deleteFragmentMarkdown,
   syncCompiledStoryFromCurrentChain,
   syncFragmentMarkdown,
@@ -61,17 +64,6 @@ function normalizeFragment(fragment: Fragment | null): Fragment | null {
   }
 }
 
-function makeVersionSnapshot(fragment: Fragment, reason?: string): FragmentVersion {
-  return {
-    version: fragment.version ?? 1,
-    name: fragment.name,
-    description: fragment.description,
-    content: fragment.content,
-    createdAt: new Date().toISOString(),
-    ...(reason ? { reason } : {}),
-  }
-}
-
 // --- Story CRUD ---
 
 export async function createStory(
@@ -89,7 +81,9 @@ export async function getStory(
   dataDir: string,
   storyId: string
 ): Promise<StoryMeta | null> {
-  return readJson<StoryMeta>(storyMetaPath(dataDir, storyId))
+  const jsonStory = await readJson<StoryMeta>(storyMetaPath(dataDir, storyId))
+  if (jsonStory) return jsonStory
+  return loadMarkdownStoryMeta(dataDir, storyId)
 }
 
 export async function listStories(dataDir: string): Promise<StoryMeta[]> {
@@ -152,7 +146,8 @@ export async function getFragment(
   fragmentId: string
 ): Promise<Fragment | null> {
   const fragment = await readJson<Fragment>(await fragmentPath(dataDir, storyId, fragmentId))
-  return normalizeFragment(fragment)
+  if (fragment) return normalizeFragment(fragment)
+  return normalizeFragment(await loadMarkdownFragmentById(dataDir, storyId, fragmentId))
 }
 
 export async function listFragments(
@@ -162,10 +157,16 @@ export async function listFragments(
   opts?: { includeArchived?: boolean }
 ): Promise<Fragment[]> {
   const dir = await fragmentsDir(dataDir, storyId)
-  if (!existsSync(dir)) return []
+  if (!existsSync(dir)) {
+    return listMarkdownFragments(dataDir, storyId, type, opts)
+  }
 
   const includeArchived = opts?.includeArchived ?? false
   const entries = await readdir(dir)
+  const hasJsonEntries = entries.some((entry) => entry.endsWith('.json'))
+  if (!hasJsonEntries) {
+    return listMarkdownFragments(dataDir, storyId, type, opts)
+  }
   const fragments: Fragment[] = []
 
   // Determine prefix filter
@@ -252,35 +253,24 @@ export async function updateFragmentVersioned(
   updates: Partial<Pick<Fragment, 'name' | 'description' | 'content'>>,
   opts?: { reason?: string }
 ): Promise<Fragment | null> {
+  void opts
   const existing = await getFragment(dataDir, storyId, fragmentId)
   if (!existing) return null
 
   const nextName = updates.name ?? existing.name
   const nextDescription = updates.description ?? existing.description
   const nextContent = updates.content ?? existing.content
-  const hasVersionedChange =
-    nextName !== existing.name ||
-    nextDescription !== existing.description ||
-    nextContent !== existing.content
 
   const now = new Date().toISOString()
-  const updated: Fragment = hasVersionedChange
-    ? {
-        ...existing,
-        name: nextName,
-        description: nextDescription,
-        content: nextContent,
-        updatedAt: now,
-        version: (existing.version ?? 1) + 1,
-        versions: [...(existing.versions ?? []), makeVersionSnapshot(existing, opts?.reason)],
-      }
-    : {
-        ...existing,
-        name: nextName,
-        description: nextDescription,
-        content: nextContent,
-        updatedAt: now,
-      }
+  const updated: Fragment = {
+    ...existing,
+    name: nextName,
+    description: nextDescription,
+    content: nextContent,
+    updatedAt: now,
+    version: 1,
+    versions: [],
+  }
 
   await updateFragment(dataDir, storyId, updated)
   return updated
@@ -293,7 +283,7 @@ export async function listFragmentVersions(
 ): Promise<FragmentVersion[] | null> {
   const fragment = await getFragment(dataDir, storyId, fragmentId)
   if (!fragment) return null
-  return [...(fragment.versions ?? [])]
+  return []
 }
 
 export async function revertFragmentToVersion(
@@ -302,34 +292,11 @@ export async function revertFragmentToVersion(
   fragmentId: string,
   targetVersion?: number
 ): Promise<Fragment | null> {
-  const fragment = await getFragment(dataDir, storyId, fragmentId)
-  if (!fragment) return null
-
-  const versions = fragment.versions ?? []
-  const snapshot = targetVersion === undefined
-    ? versions.at(-1)
-    : versions.find((v) => v.version === targetVersion)
-  if (!snapshot) return null
-
-  const now = new Date().toISOString()
-  const nextVersion = (fragment.version ?? 1) + 1
-  const updated: Fragment = {
-    ...fragment,
-    name: snapshot.name,
-    description: snapshot.description,
-    content: snapshot.content,
-    updatedAt: now,
-    version: nextVersion,
-    versions: [
-      ...versions,
-      makeVersionSnapshot(fragment, targetVersion === undefined
-        ? `revert-to-${snapshot.version}`
-        : `revert-to-${targetVersion}`),
-    ],
-  }
-
-  await updateFragment(dataDir, storyId, updated)
-  return updated
+  void dataDir
+  void storyId
+  void fragmentId
+  void targetVersion
+  return null
 }
 
 export async function deleteFragment(

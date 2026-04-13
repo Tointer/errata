@@ -221,12 +221,14 @@ export function fragmentRoutes(dataDir: string) {
     }, { detail: { summary: 'Permanently delete an archived fragment' } })
 
     .get('/stories/:storyId/fragments/:fragmentId/versions', async ({ params, set }) => {
-      const versions = await listFragmentVersions(dataDir, params.storyId, params.fragmentId)
-      if (!versions) {
+      const fragment = await getFragment(dataDir, params.storyId, params.fragmentId)
+      if (!fragment) {
         set.status = 404
         return { error: 'Fragment not found' }
       }
-      return { versions }
+
+      set.status = 410
+      return { error: 'Fragment version history has been removed from Errata.' }
     }, { detail: { summary: 'List version history' } })
 
     .post('/stories/:storyId/fragments/:fragmentId/versions/:version/revert', async ({ params, set }) => {
@@ -245,12 +247,9 @@ export function fragmentRoutes(dataDir: string) {
         set.status = 404
         return { error: 'Fragment not found' }
       }
-      const updated = await revertFragmentToVersion(dataDir, params.storyId, params.fragmentId, targetVersion)
-      if (!updated) {
-        set.status = 422
-        return { error: `Version ${targetVersion} not found` }
-      }
-      return updated
+
+      set.status = 410
+      return { error: 'Fragment version history has been removed from Errata.' }
     }, { detail: { summary: 'Revert to a specific version' } })
 
     // --- Archive / Restore ---

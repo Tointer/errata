@@ -1,4 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
+import { rm } from 'node:fs/promises'
+import { join } from 'node:path'
 import { createTempDir, makeTestSettings } from '../setup'
 import {
   createStory,
@@ -14,8 +16,6 @@ import {
   deleteFragment,
   archiveFragment,
   restoreFragment,
-  listFragmentVersions,
-  revertFragmentToVersion,
 } from '@/server/fragments/storage'
 import type { Fragment, StoryMeta } from '@/server/fragments/schema'
 
@@ -98,6 +98,19 @@ describe('Story CRUD', () => {
     const result = await getStory(dataDir, 'nonexistent')
     expect(result).toBeNull()
   })
+
+  it('reads story metadata from markdown when meta.json is absent', async () => {
+    const story = makeStory()
+    await createStory(dataDir, story)
+
+    await rm(join(dataDir, 'stories', story.id, 'meta.json'))
+
+    const retrieved = await getStory(dataDir, story.id)
+    expect(retrieved).not.toBeNull()
+    expect(retrieved!.id).toBe(story.id)
+    expect(retrieved!.name).toBe(story.name)
+    expect(retrieved!.description).toBe(story.description)
+  })
 })
 
 describe('Fragment CRUD', () => {
@@ -159,7 +172,7 @@ describe('Fragment CRUD', () => {
     expect(retrieved!.content).toBe('New content here.')
   })
 
-  it('creates a version snapshot when versioned content update runs', async () => {
+  it('updates content without storing native version history', async () => {
     const fragment = makeFragment({
       id: 'ch-1000',
       type: 'character',
@@ -178,14 +191,13 @@ describe('Fragment CRUD', () => {
     )
 
     expect(updated).not.toBeNull()
-    expect(updated!.version).toBe(2)
-    expect(updated!.versions).toHaveLength(1)
-    expect(updated!.versions![0].version).toBe(1)
-    expect(updated!.versions![0].content).toBe('Original content')
-    expect(updated!.versions![0].reason).toBe('test-refine')
+    expect(updated!.version).toBe(1)
+    expect(updated!.versions).toEqual([])
+    expect(updated!.content).toBe('Updated content')
+    expect(updated!.description).toBe('Updated desc')
   })
 
-  it('lists versions and can revert to a specific version', async () => {
+  it('does not expose built-in version history anymore', async () => {
     const fragment = makeFragment({
       id: 'gl-2000',
       type: 'guideline',
@@ -198,19 +210,11 @@ describe('Fragment CRUD', () => {
     await updateFragmentVersioned(dataDir, storyId, 'gl-2000', { content: 'v2 content', description: 'v2 desc' })
     await updateFragmentVersioned(dataDir, storyId, 'gl-2000', { content: 'v3 content', description: 'v3 desc' })
 
-    const versions = await listFragmentVersions(dataDir, storyId, 'gl-2000')
-    expect(versions).not.toBeNull()
-    expect(versions).toHaveLength(2)
-    expect(versions![0].version).toBe(1)
-    expect(versions![1].version).toBe(2)
-
-    const reverted = await revertFragmentToVersion(dataDir, storyId, 'gl-2000', 1)
-    expect(reverted).not.toBeNull()
-    expect(reverted!.id).toBe('gl-2000')
-    expect(reverted!.content).toBe('v1 content')
-    expect(reverted!.description).toBe('v1 desc')
-    expect(reverted!.version).toBe(4)
-    expect(reverted!.versions).toHaveLength(3)
+    const retrieved = await getFragment(dataDir, storyId, 'gl-2000')
+    expect(retrieved).not.toBeNull()
+    expect(retrieved!.content).toBe('v3 content')
+    expect(retrieved!.version).toBe(1)
+    expect(retrieved!.versions).toEqual([])
   })
 
   it('deletes a fragment', async () => {
@@ -224,6 +228,40 @@ describe('Fragment CRUD', () => {
   it('returns null for non-existent fragment', async () => {
     const result = await getFragment(dataDir, storyId, 'pr-zzzz')
     expect(result).toBeNull()
+  })
+
+  it('reads fragment data from markdown when fragment json is absent', async () => {
+    const fragment = makeFragment({ id: 'pr-mdonly' })
+    await createFragment(dataDir, storyId, fragment)
+
+    await rm(join(dataDir, 'stories', storyId, 'fragments', `${fragment.id}.json`))
+
+    const retrieved = await getFragment(dataDir, storyId, fragment.id)
+    expect(retrieved).not.toBeNull()
+    expect(retrieved!.id).toBe(fragment.id)
+    expect(retrieved!.content).toBe(fragment.content)
+    expect(retrieved!.version).toBe(1)
+  })
+
+  it('lists fragments from markdown when fragment json files are absent', async () => {
+    const prose = makeFragment({ id: 'pr-mdlist' })
+    const character = makeFragment({
+      id: 'ch-mdlist',
+      type: 'character',
+      name: 'Asha',
+      description: 'Pilot',
+      content: 'Asha carries the map fragments.',
+    })
+
+    await createFragment(dataDir, storyId, prose)
+    await createFragment(dataDir, storyId, character)
+
+    await rm(join(dataDir, 'stories', storyId, 'fragments', `${prose.id}.json`))
+    await rm(join(dataDir, 'stories', storyId, 'fragments', `${character.id}.json`))
+
+    const listed = await listFragments(dataDir, storyId)
+    expect(listed).toHaveLength(2)
+    expect(listed.map((fragment) => fragment.id).sort()).toEqual(['ch-mdlist', 'pr-mdlist'])
   })
 })
 

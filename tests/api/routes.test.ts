@@ -279,7 +279,7 @@ describe('Fragment API routes', () => {
     expect(listData).toHaveLength(1)
   })
 
-  it('GET /api/stories/:sid/fragments/:fid/versions lists version snapshots', async () => {
+  it('GET /api/stories/:sid/fragments/:fid/versions reports removed feature', async () => {
     const created = await (
       await apiJson(`/stories/${storyId}/fragments`, {
         type: 'character',
@@ -300,14 +300,12 @@ describe('Fragment API routes', () => {
     )
 
     const versionsRes = await api(`/stories/${storyId}/fragments/${created.id}/versions`)
-    expect(versionsRes.status).toBe(200)
+    expect(versionsRes.status).toBe(410)
     const body = await versionsRes.json()
-    expect(body.versions).toHaveLength(1)
-    expect(body.versions[0].version).toBe(1)
-    expect(body.versions[0].content).toBe('v1 content')
+    expect(body.error).toContain('removed')
   })
 
-  it('POST /api/stories/:sid/fragments/:fid/versions/:version/revert restores the selected version', async () => {
+  it('POST /api/stories/:sid/fragments/:fid/versions/:version/revert reports removed feature', async () => {
     const created = await (
       await apiJson(`/stories/${storyId}/fragments`, {
         type: 'knowledge',
@@ -340,11 +338,9 @@ describe('Fragment API routes', () => {
     const revertRes = await api(`/stories/${storyId}/fragments/${created.id}/versions/1/revert`, {
       method: 'POST',
     })
-    expect(revertRes.status).toBe(200)
+    expect(revertRes.status).toBe(410)
     const reverted = await revertRes.json()
-    expect(reverted.id).toBe(created.id)
-    expect(reverted.content).toBe('v1 content')
-    expect(reverted.version).toBe(4)
+    expect(reverted.error).toContain('removed')
   })
 })
 

@@ -109,6 +109,39 @@ function serializeStoryMeta(story: StoryMeta): string {
   )
 }
 
+function storyMetaFromMarkdown(attributes: Record<string, unknown>, body: string): StoryMeta | null {
+  if (typeof attributes.id !== 'string' || typeof attributes.name !== 'string') return null
+  return {
+    id: attributes.id,
+    name: attributes.name,
+    description: body,
+    coverImage: typeof attributes.coverImage === 'string' || attributes.coverImage === null
+      ? attributes.coverImage as string | null
+      : null,
+    summary: typeof attributes.summary === 'string' ? attributes.summary : '',
+    createdAt: typeof attributes.createdAt === 'string' ? attributes.createdAt : new Date().toISOString(),
+    updatedAt: typeof attributes.updatedAt === 'string' ? attributes.updatedAt : new Date().toISOString(),
+    settings: {
+      outputFormat: 'markdown',
+      enabledPlugins: [],
+      summarizationThreshold: 4,
+      maxSteps: 10,
+      modelOverrides: {},
+      generationMode: 'standard',
+      disableLibrarianAutoAnalysis: false,
+      autoApplyLibrarianSuggestions: false,
+      disableLibrarianDirections: false,
+      disableLibrarianSuggestions: false,
+      contextOrderMode: 'simple',
+      fragmentOrder: [],
+      contextCompact: { type: 'proseLimit', value: 10 },
+      summaryCompact: { maxCharacters: 12000, targetCharacters: 9000 },
+      enableHierarchicalSummary: false,
+      disableThinking: false,
+    },
+  }
+}
+
 function serializeFragment(fragment: Fragment): string {
   return serializeFrontmatter(
     {
@@ -167,6 +200,14 @@ export async function syncStoryMarkdownMeta(dataDir: string, story: StoryMeta): 
   await writeFile(getStoryMetaPath(dataDir, story.id), serializeStoryMeta(story), 'utf-8')
 }
 
+export async function loadMarkdownStoryMeta(dataDir: string, storyId: string): Promise<StoryMeta | null> {
+  const path = getStoryMetaPath(dataDir, storyId)
+  if (!existsSync(path)) return null
+  const raw = await readFile(path, 'utf-8')
+  const parsed = parseFrontmatter(raw)
+  return storyMetaFromMarkdown(parsed.attributes, parsed.body)
+}
+
 async function listMarkdownFragmentPaths(dataDir: string, storyId: string, fragmentId: string): Promise<string[]> {
   const root = getMarkdownStoryRoot(dataDir, storyId)
   const matches: string[] = []
@@ -217,6 +258,41 @@ export async function loadMarkdownFragmentById(dataDir: string, storyId: string,
   const raw = await readFile(path, 'utf-8')
   const parsed = parseFrontmatter(raw)
   return fragmentFromMarkdown(parsed.attributes, parsed.body)
+}
+
+export async function listMarkdownFragments(
+  dataDir: string,
+  storyId: string,
+  type?: string,
+  opts?: { includeArchived?: boolean },
+): Promise<Fragment[]> {
+  const root = getMarkdownStoryRoot(dataDir, storyId)
+  if (!existsSync(root)) return []
+
+  const includeArchived = opts?.includeArchived ?? false
+  const folders = type ? [getFragmentFolder(type)] : [...STORY_DIRS]
+  const fragments: Fragment[] = []
+
+  for (const folder of folders) {
+    const folderPath = join(root, folder)
+    if (!existsSync(folderPath)) continue
+    const entries = await readdir(folderPath)
+    for (const entry of entries) {
+      if (!entry.endsWith('.md')) continue
+      const raw = await readFile(join(folderPath, entry), 'utf-8')
+      const parsed = parseFrontmatter(raw)
+      const fragment = fragmentFromMarkdown(parsed.attributes, parsed.body)
+      if (!fragment) continue
+      if (type && fragment.type !== type) continue
+      if (!includeArchived && fragment.archived) continue
+      fragments.push(fragment)
+    }
+  }
+
+  return fragments.sort((left, right) => {
+    if (left.order !== right.order) return left.order - right.order
+    return left.id.localeCompare(right.id)
+  })
 }
 
 async function readCurrentProseChain(dataDir: string, storyId: string): Promise<ProseChain | null> {
