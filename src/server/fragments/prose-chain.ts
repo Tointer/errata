@@ -1,16 +1,14 @@
 import { readFile } from 'node:fs/promises'
 import { existsSync } from 'node:fs'
-import { join } from 'node:path'
 import type { ProseChain } from './schema'
-import { getContentRoot } from './branches'
+import { getInternalStoryPath } from '../md-files/paths'
 import { writeJsonAtomic } from '../fs-utils'
 import { syncCompiledStoryFromCurrentChain, syncProseMarkdownOrder } from '../md-files'
 
 const PROSE_CHAIN_FILE = 'prose-chain.json'
 
 async function proseChainPath(dataDir: string, storyId: string): Promise<string> {
-  const root = await getContentRoot(dataDir, storyId)
-  return join(root, PROSE_CHAIN_FILE)
+  return getInternalStoryPath(dataDir, storyId, PROSE_CHAIN_FILE)
 }
 
 /**

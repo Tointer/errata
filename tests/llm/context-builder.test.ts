@@ -630,7 +630,7 @@ describe('context-builder', () => {
       timelineEvents: [],
     })
 
-    const indexPath = join(dataDir, 'stories', story.id, 'branches', 'main', 'librarian', 'index.json')
+    const indexPath = join(dataDir, 'stories', story.id, '.errata', 'librarian', 'index.json')
     if (existsSync(indexPath)) {
       await unlink(indexPath)
     }

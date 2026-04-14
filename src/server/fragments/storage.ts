@@ -2,8 +2,9 @@ import { mkdir, readdir, rm } from 'node:fs/promises'
 import { join } from 'node:path'
 import { existsSync } from 'node:fs'
 import type { Fragment, FragmentVersion, StoryMeta } from './schema'
-import { getContentRoot, initBranches } from './branches'
+import { initBranches } from './branches'
 import { createLogger } from '../logging'
+import { getInternalStoryRoot } from '../md-files/paths'
 import {
   loadMarkdownFragmentById,
   loadMarkdownStoryMeta,
@@ -31,8 +32,7 @@ function storyMetaJsonPath(dataDir: string, storyId: string) {
 }
 
 async function fragmentJsonPath(dataDir: string, storyId: string, fragmentId: string) {
-  const root = await getContentRoot(dataDir, storyId)
-  const dir = join(root, 'fragments')
+  const dir = join(getInternalStoryRoot(dataDir, storyId), 'fragments')
   await mkdir(dir, { recursive: true })
   return join(dir, `${fragmentId}.json`)
 }

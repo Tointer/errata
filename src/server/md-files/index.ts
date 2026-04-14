@@ -1,5 +1,7 @@
 export {
   getCompiledStoryPath,
+  getInternalStoryRoot,
+  getInternalStoryPath,
   getMarkdownStoryRoot,
 } from './paths'
 

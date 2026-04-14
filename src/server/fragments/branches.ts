@@ -86,5 +86,5 @@ export async function renameBranch(_dataDir: string, _storyId: string, _branchId
 export async function initBranches(dataDir: string, storyId: string): Promise<void> {
   const dir = storyDir(dataDir, storyId)
   await mkdir(dir, { recursive: true })
-  await mkdir(join(dir, 'fragments'), { recursive: true })
+  await mkdir(join(dir, '.errata', 'fragments'), { recursive: true })
 }

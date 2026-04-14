@@ -11,6 +11,7 @@ import {
 import { addProseSection, addProseVariation } from '@/server/fragments/prose-chain'
 import {
   getCompiledStoryPath,
+  getInternalStoryRoot,
   getMarkdownStoryRoot,
   loadMarkdownFragmentById,
 } from '@/server/md-files'
@@ -72,8 +73,11 @@ describe('md-files repository sync', () => {
       await createFragment(tmp.path, story.id, guideline)
 
       const root = getMarkdownStoryRoot(tmp.path, story.id)
-      const storyMeta = await readFile(join(root, '_story.md'), 'utf-8')
+      const storyMeta = await readFile(join(getInternalStoryRoot(tmp.path, story.id), '_story.md'), 'utf-8')
       expect(storyMeta).toContain('name: "Markdown Story"')
+
+      const rootEntries = (await readdir(root)).sort()
+      expect(rootEntries).toEqual(['.errata', 'Characters', 'Guidelines', 'Lorebook', 'Prose', 'story.md'])
 
       const loaded = await loadMarkdownFragmentById(tmp.path, story.id, guideline.id)
       expect(loaded?.type).toBe('guideline')

@@ -2,12 +2,14 @@ import { mkdir, readdir, readFile, rm, writeFile } from 'node:fs/promises'
 import { existsSync } from 'node:fs'
 import { join } from 'node:path'
 import type { Fragment, ProseChain, StoryMeta } from '@/server/fragments/schema'
-import { getContentRoot } from '@/server/fragments/branches'
 import {
   getCompiledStoryPath,
   getFragmentFileName,
   getFragmentFolder,
   getInternalStoryRoot,
+  getInternalStoryPath,
+  INTERNAL_MARKDOWN_DIRS,
+  MARKDOWN_FRAGMENT_DIRS,
   getMarkdownStoryRoot,
   getProseFragmentIdFromFileName,
   getStoryMetaPath,
@@ -75,6 +77,7 @@ export async function ensureMarkdownStoryLayout(dataDir: string, storyId: string
   await mkdir(root, { recursive: true })
   await Promise.all([
     ...STORY_DIRS.map((dirName) => mkdir(join(root, dirName), { recursive: true })),
+    ...INTERNAL_MARKDOWN_DIRS.map((dirName) => mkdir(join(root, dirName), { recursive: true })),
     mkdir(getInternalStoryRoot(dataDir, storyId), { recursive: true }),
   ])
   const compiledPath = getCompiledStoryPath(dataDir, storyId)
@@ -100,7 +103,7 @@ async function listMarkdownFragmentPaths(dataDir: string, storyId: string, fragm
   const root = getMarkdownStoryRoot(dataDir, storyId)
   const matches: string[] = []
 
-  for (const folder of STORY_DIRS) {
+  for (const folder of MARKDOWN_FRAGMENT_DIRS) {
     const folderPath = join(root, folder)
     if (!existsSync(folderPath)) continue
     const entries = await readdir(folderPath)
@@ -115,8 +118,7 @@ async function listMarkdownFragmentPaths(dataDir: string, storyId: string, fragm
 }
 
 async function readCurrentProseChain(dataDir: string, storyId: string): Promise<ProseChain | null> {
-  const root = await getContentRoot(dataDir, storyId)
-  const chainPath = join(root, 'prose-chain.json')
+  const chainPath = getInternalStoryPath(dataDir, storyId, 'prose-chain.json')
   if (!existsSync(chainPath)) return null
   const raw = await readFile(chainPath, 'utf-8')
   return JSON.parse(raw) as ProseChain
@@ -188,9 +190,9 @@ export async function listMarkdownFragments(
   if (!existsSync(root)) return []
 
   const includeArchived = opts?.includeArchived ?? false
-  const folders = type ? [getFragmentFolder(type)] : [...STORY_DIRS]
+  const folders = type ? [getFragmentFolder(type)] : [...MARKDOWN_FRAGMENT_DIRS]
   const fragments: Fragment[] = []
-  const proseIndex = folders.includes('Prose') ? await readProseFragmentIndex(dataDir, storyId) : {}
+  const proseIndex = folders.includes(getFragmentFolder('prose')) ? await readProseFragmentIndex(dataDir, storyId) : {}
 
   for (const folder of folders) {
     const folderPath = join(root, folder)

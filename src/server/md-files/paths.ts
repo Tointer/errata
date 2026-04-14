@@ -6,11 +6,14 @@ export const STORY_OUTPUT_FILE = 'story.md'
 export const INTERNAL_DIR = '.errata'
 export const PROSE_FRAGMENT_INDEX_FILE = 'prose-fragments.json'
 
-const FOLDER_BY_TYPE: Record<string, string> = {
+const VISIBLE_FOLDER_BY_TYPE: Record<string, string> = {
   prose: 'Prose',
   character: 'Characters',
   guideline: 'Guidelines',
   knowledge: 'Lorebook',
+}
+
+const INTERNAL_FOLDER_BY_TYPE: Record<string, string> = {
   marker: 'Markers',
   image: 'Images',
   icon: 'Icons',
@@ -21,11 +24,16 @@ export const STORY_DIRS = [
   'Characters',
   'Lorebook',
   'Prose',
-  'Markers',
-  'Images',
-  'Icons',
-  'Fragments',
 ] as const
+
+export const INTERNAL_MARKDOWN_DIRS = [
+  join(INTERNAL_DIR, 'Markers'),
+  join(INTERNAL_DIR, 'Images'),
+  join(INTERNAL_DIR, 'Icons'),
+  join(INTERNAL_DIR, 'Fragments'),
+]
+
+export const MARKDOWN_FRAGMENT_DIRS = [...STORY_DIRS, ...INTERNAL_MARKDOWN_DIRS]
 
 function storiesDir(dataDir: string): string {
   return join(dataDir, 'stories')
@@ -36,7 +44,7 @@ export function getMarkdownStoryRoot(dataDir: string, storyId: string): string {
 }
 
 export function getStoryMetaPath(dataDir: string, storyId: string): string {
-  return join(getMarkdownStoryRoot(dataDir, storyId), STORY_META_FILE)
+  return join(getInternalStoryRoot(dataDir, storyId), STORY_META_FILE)
 }
 
 export function getCompiledStoryPath(dataDir: string, storyId: string): string {
@@ -47,12 +55,20 @@ export function getInternalStoryRoot(dataDir: string, storyId: string): string {
   return join(getMarkdownStoryRoot(dataDir, storyId), INTERNAL_DIR)
 }
 
+export function getInternalStoryPath(dataDir: string, storyId: string, ...segments: string[]): string {
+  return join(getInternalStoryRoot(dataDir, storyId), ...segments)
+}
+
 export function getProseFragmentIndexPath(dataDir: string, storyId: string): string {
   return join(getInternalStoryRoot(dataDir, storyId), PROSE_FRAGMENT_INDEX_FILE)
 }
 
 export function getFragmentFolder(type: string): string {
-  return FOLDER_BY_TYPE[type] ?? 'Fragments'
+  const visibleFolder = VISIBLE_FOLDER_BY_TYPE[type]
+  if (visibleFolder) return visibleFolder
+
+  const internalFolder = INTERNAL_FOLDER_BY_TYPE[type] ?? 'Fragments'
+  return join(INTERNAL_DIR, internalFolder)
 }
 
 function getNumericPrefix(index: number): string {
