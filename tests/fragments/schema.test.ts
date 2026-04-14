@@ -15,7 +15,7 @@ describe('FragmentIdSchema', () => {
   })
 
   it('rejects invalid fragment IDs', () => {
-    const invalid = ['', 'prose-abc', 'PR-A1B2', 'pr_a1b2', 'p-abc', 'pr-ab', 'pr-ABC!']
+    const invalid = ['', 'prose-abc', 'PR-A1B2', 'pr_a1b2', 'p-abc', 'pr--ab', 'pr-ABC!']
     for (const id of invalid) {
       expect(() => FragmentIdSchema.parse(id)).toThrow()
     }
