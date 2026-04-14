@@ -1,7 +1,7 @@
 import { mkdir, readFile, writeFile } from 'node:fs/promises'
 import { existsSync } from 'node:fs'
 import type { Fragment } from '@/server/fragments/schema'
-import { getInternalStoryRoot, getProseFragmentIndexPath } from './markdown-paths'
+import { getInternalStoryRoot, getProseFragmentIndexPath } from './paths'
 import { buildProseInternalRecord, type ProseFragmentInternalRecord } from './prose-metadata'
 
 export async function readProseFragmentIndex(dataDir: string, storyId: string): Promise<Record<string, ProseFragmentInternalRecord>> {

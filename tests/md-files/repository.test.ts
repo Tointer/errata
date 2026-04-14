@@ -13,7 +13,7 @@ import {
   getCompiledStoryPath,
   getMarkdownStoryRoot,
   loadMarkdownFragmentById,
-} from '@/server/stories/markdown-repository'
+} from '@/server/md-files'
 
 function makeStory(id: string): StoryMeta {
   const now = new Date().toISOString()
@@ -52,7 +52,7 @@ function makeFragment(id: string, overrides?: Partial<Fragment>): Fragment {
   }
 }
 
-describe('markdown story repository sync', () => {
+describe('md-files repository sync', () => {
   it('creates markdown story layout and syncs setup fragments', async () => {
     const tmp = await createTempDir()
 

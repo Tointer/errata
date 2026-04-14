@@ -12,7 +12,7 @@ import {
   syncCompiledStoryFromCurrentChain,
   syncFragmentMarkdown,
   syncStoryMarkdownMeta,
-} from '../stories/markdown-repository'
+} from '../md-files'
 
 const requestLogger = createLogger('fragment-storage')
 
@@ -35,11 +35,6 @@ async function fragmentJsonPath(dataDir: string, storyId: string, fragmentId: st
   const dir = join(root, 'fragments')
   await mkdir(dir, { recursive: true })
   return join(dir, `${fragmentId}.json`)
-}
-
-async function fragmentsDir(dataDir: string, storyId: string) {
-  const root = await getContentRoot(dataDir, storyId)
-  return join(root, 'fragments')
 }
 
 async function removeFileIfExists(path: string): Promise<void> {

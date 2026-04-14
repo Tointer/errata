@@ -4,7 +4,7 @@ import { join } from 'node:path'
 import type { ProseChain } from './schema'
 import { getContentRoot } from './branches'
 import { writeJsonAtomic } from '../fs-utils'
-import { syncCompiledStoryFromCurrentChain, syncProseMarkdownOrder } from '../stories/markdown-repository'
+import { syncCompiledStoryFromCurrentChain, syncProseMarkdownOrder } from '../md-files'
 
 const PROSE_CHAIN_FILE = 'prose-chain.json'
 
