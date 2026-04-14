@@ -97,7 +97,7 @@ export function FragmentExportPanel({ storyId, storyName, onClose }: FragmentExp
     const groups: Record<string, Fragment[]> = {}
     for (const type of EXPORTABLE_TYPES) {
       const list = allFragments
-        .filter((f) => f.type === type && !f.archived)
+        .filter((f) => f.type === type)
         .sort((a, b) => a.order - b.order || a.createdAt.localeCompare(b.createdAt))
       if (list.length > 0) groups[type] = list
     }

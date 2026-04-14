@@ -1,8 +1,9 @@
-import { mkdir, readdir, readFile, rm, writeFile } from 'node:fs/promises'
+import { mkdir, readdir, readFile, rename, rm, writeFile } from 'node:fs/promises'
 import { existsSync } from 'node:fs'
 import { join } from 'node:path'
 import type { Fragment, ProseChain, StoryMeta } from '@/server/fragments/schema'
 import {
+  ARCHIVE_SUBDIR,
   getFilenameDerivedFragmentId,
   getCompiledStoryPath,
   getFragmentFileName,
@@ -27,6 +28,14 @@ import {
 } from './prose-fragment-index'
 import { serializeStoryMeta, storyMetaFromMarkdown } from './story-meta'
 
+function optionalList<T>(value: T[]): T[] | undefined {
+  return value.length > 0 ? value : undefined
+}
+
+function optionalRecord(value: Record<string, unknown>): Record<string, unknown> | undefined {
+  return Object.keys(value).length > 0 ? value : undefined
+}
+
 function serializeFragment(fragment: Fragment): string {
   if (fragment.type === 'prose') {
     const { markdownMeta } = splitProseInternalMeta(fragment.meta)
@@ -37,15 +46,14 @@ function serializeFragment(fragment: Fragment): string {
     return serializeFrontmatter(
       {
         description: fragment.description,
-        tags: fragment.tags,
-        refs: fragment.refs,
+        tags: optionalList(fragment.tags),
+        refs: optionalList(fragment.refs),
         sticky: fragment.sticky,
         placement: fragment.placement,
         order: fragment.order,
         createdAt: fragment.createdAt,
         updatedAt: fragment.updatedAt,
-        archived: fragment.archived ?? false,
-        meta: fragment.meta,
+        meta: optionalRecord(fragment.meta),
       },
       fragment.content,
     )
@@ -57,15 +65,14 @@ function serializeFragment(fragment: Fragment): string {
       type: fragment.type,
       name: fragment.name,
       description: fragment.description,
-      tags: fragment.tags,
-      refs: fragment.refs,
+      tags: optionalList(fragment.tags),
+      refs: optionalList(fragment.refs),
       sticky: fragment.sticky,
       placement: fragment.placement,
       order: fragment.order,
       createdAt: fragment.createdAt,
       updatedAt: fragment.updatedAt,
-      archived: fragment.archived ?? false,
-      meta: fragment.meta,
+      meta: optionalRecord(fragment.meta),
     },
     fragment.content,
   )
@@ -87,7 +94,6 @@ function fragmentFromLegacyMarkdown(attributes: Record<string, unknown>, body: s
     updatedAt: typeof attributes.updatedAt === 'string' ? attributes.updatedAt : new Date().toISOString(),
     order: typeof attributes.order === 'number' ? attributes.order : 0,
     meta: typeof attributes.meta === 'object' && attributes.meta !== null ? attributes.meta as Record<string, unknown> : {},
-    archived: Boolean(attributes.archived),
     version: 1,
     versions: [],
   }
@@ -114,26 +120,61 @@ function visibleFragmentFromMarkdown(
     updatedAt: typeof attributes.updatedAt === 'string' ? attributes.updatedAt : new Date().toISOString(),
     order: typeof attributes.order === 'number' ? attributes.order : 0,
     meta: typeof attributes.meta === 'object' && attributes.meta !== null ? attributes.meta as Record<string, unknown> : {},
-    archived: Boolean(attributes.archived),
     version: 1,
     versions: [],
   }
+}
+
+interface MarkdownFragmentEntry {
+  path: string
+  folder: string
+  entry: string
+  archived: boolean
+}
+
+async function listFolderEntries(
+  folderPath: string,
+  folder: string,
+  opts: { includeArchived?: boolean; onlyArchived?: boolean },
+): Promise<MarkdownFragmentEntry[]> {
+  const matches: MarkdownFragmentEntry[] = []
+
+  if (!opts.onlyArchived && existsSync(folderPath)) {
+    const entries = await readdir(folderPath)
+    for (const entry of entries) {
+      if (!entry.endsWith('.md')) continue
+      matches.push({ path: join(folderPath, entry), folder, entry, archived: false })
+    }
+  }
+
+  if ((opts.includeArchived || opts.onlyArchived)) {
+    const archivePath = join(folderPath, ARCHIVE_SUBDIR)
+    if (existsSync(archivePath)) {
+      const archiveEntries = await readdir(archivePath)
+      for (const entry of archiveEntries) {
+        if (!entry.endsWith('.md')) continue
+        matches.push({ path: join(archivePath, entry), folder, entry, archived: true })
+      }
+    }
+  }
+
+  return matches
 }
 
 async function findMarkdownFragmentEntry(
   dataDir: string,
   storyId: string,
   fragmentId: string,
-): Promise<Array<{ path: string; folder: string; entry: string }>> {
+  opts: { includeArchived?: boolean; onlyArchived?: boolean } = { includeArchived: true },
+): Promise<MarkdownFragmentEntry[]> {
   const root = getMarkdownStoryRoot(dataDir, storyId)
-  const matches: Array<{ path: string; folder: string; entry: string }> = []
+  const matches: MarkdownFragmentEntry[] = []
 
   for (const folder of MARKDOWN_FRAGMENT_DIRS) {
     const folderPath = join(root, folder)
-    if (!existsSync(folderPath)) continue
-    const entries = await readdir(folderPath)
-    for (const entry of entries) {
-      if (!entry.endsWith('.md')) continue
+    const entries = await listFolderEntries(folderPath, folder, opts)
+    for (const candidate of entries) {
+      const entry = candidate.entry
 
       let candidateId: string | null = null
       const visibleType = getTypeForVisibleFolder(folder)
@@ -146,7 +187,7 @@ async function findMarkdownFragmentEntry(
       }
 
       if (candidateId !== fragmentId) continue
-      matches.push({ path: join(folderPath, entry), folder, entry })
+      matches.push(candidate)
     }
   }
 
@@ -178,10 +219,6 @@ export async function loadMarkdownStoryMeta(dataDir: string, storyId: string): P
   const raw = await readFile(path, 'utf-8')
   const parsed = parseFrontmatter(raw)
   return storyMetaFromMarkdown(parsed.attributes, parsed.body)
-}
-
-async function listMarkdownFragmentPaths(dataDir: string, storyId: string, fragmentId: string): Promise<string[]> {
-  return (await findMarkdownFragmentEntry(dataDir, storyId, fragmentId)).map((match) => match.path)
 }
 
 async function readCurrentProseChain(dataDir: string, storyId: string): Promise<ProseChain | null> {
@@ -223,7 +260,7 @@ export async function syncFragmentMarkdown(dataDir: string, storyId: string, fra
 }
 
 export async function deleteFragmentMarkdown(dataDir: string, storyId: string, fragmentId: string): Promise<void> {
-  const existingPaths = await listMarkdownFragmentPaths(dataDir, storyId, fragmentId)
+  const existingPaths = (await findMarkdownFragmentEntry(dataDir, storyId, fragmentId, { includeArchived: true })).map((entry) => entry.path)
   for (const path of existingPaths) {
     if (existsSync(path)) {
       await rm(path, { force: true })
@@ -233,7 +270,7 @@ export async function deleteFragmentMarkdown(dataDir: string, storyId: string, f
 }
 
 export async function loadMarkdownFragmentById(dataDir: string, storyId: string, fragmentId: string): Promise<Fragment | null> {
-  const matches = await findMarkdownFragmentEntry(dataDir, storyId, fragmentId)
+  const matches = await findMarkdownFragmentEntry(dataDir, storyId, fragmentId, { includeArchived: true })
   const match = matches[0]
   const path = match?.path
   if (!path || !existsSync(path)) return null
@@ -259,12 +296,10 @@ export async function listMarkdownFragments(
   dataDir: string,
   storyId: string,
   type?: string,
-  opts?: { includeArchived?: boolean },
 ): Promise<Fragment[]> {
   const root = getMarkdownStoryRoot(dataDir, storyId)
   if (!existsSync(root)) return []
 
-  const includeArchived = opts?.includeArchived ?? false
   const folders = type ? [getFragmentFolder(type)] : [...MARKDOWN_FRAGMENT_DIRS]
   const fragments: Fragment[] = []
   const proseIndex = folders.includes(getFragmentFolder('prose')) ? await readProseFragmentIndex(dataDir, storyId) : {}
@@ -272,11 +307,11 @@ export async function listMarkdownFragments(
   for (const folder of folders) {
     const folderPath = join(root, folder)
     if (!existsSync(folderPath)) continue
-    const entries = await readdir(folderPath)
+    const entries = await listFolderEntries(folderPath, folder, { includeArchived: false })
     const visibleType = getTypeForVisibleFolder(folder)
-    for (const entry of entries) {
-      if (!entry.endsWith('.md')) continue
-      const raw = await readFile(join(folderPath, entry), 'utf-8')
+    for (const record of entries) {
+      const entry = record.entry
+      const raw = await readFile(record.path, 'utf-8')
       const parsed = parseFrontmatter(raw)
       const proseId = getProseFragmentIdFromFileName(entry)
       const fragment = folder === 'Prose'
@@ -287,7 +322,6 @@ export async function listMarkdownFragments(
 
       if (!fragment) continue
       if (type && fragment.type !== type) continue
-      if (!includeArchived && fragment.archived) continue
       fragments.push(fragment)
     }
   }
@@ -320,7 +354,7 @@ export async function syncCompiledStoryFromCurrentChain(dataDir: string, storyId
   const blocks: Array<{ id: string; content: string }> = []
   for (const entry of chain.entries) {
     const fragment = await loadMarkdownFragmentById(dataDir, storyId, entry.active)
-    if (!fragment || fragment.archived || fragment.type === 'marker') continue
+    if (!fragment || await isMarkdownFragmentArchived(dataDir, storyId, entry.active) || fragment.type === 'marker') continue
     blocks.push({ id: fragment.id, content: fragment.content })
   }
 
@@ -338,4 +372,67 @@ export async function syncProseMarkdownOrder(dataDir: string, storyId: string): 
       await syncFragmentMarkdown(dataDir, storyId, fragment)
     }
   }
+}
+
+export async function isMarkdownFragmentArchived(dataDir: string, storyId: string, fragmentId: string): Promise<boolean> {
+  const match = (await findMarkdownFragmentEntry(dataDir, storyId, fragmentId, { includeArchived: true }))[0]
+  return Boolean(match?.archived)
+}
+
+export async function listArchivedMarkdownFragments(
+  dataDir: string,
+  storyId: string,
+  type?: string,
+): Promise<Fragment[]> {
+  const root = getMarkdownStoryRoot(dataDir, storyId)
+  if (!existsSync(root)) return []
+
+  const folders = type ? [getFragmentFolder(type)] : [...MARKDOWN_FRAGMENT_DIRS]
+  const fragments: Fragment[] = []
+  const proseIndex = folders.includes(getFragmentFolder('prose')) ? await readProseFragmentIndex(dataDir, storyId) : {}
+
+  for (const folder of folders) {
+    const folderPath = join(root, folder)
+    if (!existsSync(folderPath)) continue
+    const entries = await listFolderEntries(folderPath, folder, { includeArchived: true, onlyArchived: true })
+    const visibleType = getTypeForVisibleFolder(folder)
+    for (const record of entries) {
+      const raw = await readFile(record.path, 'utf-8')
+      const parsed = parseFrontmatter(raw)
+      const proseId = getProseFragmentIdFromFileName(record.entry)
+      const fragment = folder === 'Prose'
+        ? proseFragmentFromMarkdown(proseId, parsed.attributes, parsed.body, proseIndex[proseId], fragmentFromLegacyMarkdown)
+        : visibleType && isVisibleFilenameDerivedType(visibleType)
+          ? visibleFragmentFromMarkdown(visibleType, record.entry, parsed.attributes, parsed.body)
+          : fragmentFromLegacyMarkdown(parsed.attributes, parsed.body)
+
+      if (!fragment) continue
+      if (type && fragment.type !== type) continue
+      fragments.push(fragment)
+    }
+  }
+
+  return fragments.sort((left, right) => {
+    if (left.order !== right.order) return left.order - right.order
+    return left.id.localeCompare(right.id)
+  })
+}
+
+export async function archiveFragmentMarkdown(dataDir: string, storyId: string, fragmentId: string): Promise<boolean> {
+  const match = (await findMarkdownFragmentEntry(dataDir, storyId, fragmentId, { includeArchived: true }))[0]
+  if (!match || match.archived) return false
+
+  const archiveDir = join(join(getMarkdownStoryRoot(dataDir, storyId), match.folder), ARCHIVE_SUBDIR)
+  await mkdir(archiveDir, { recursive: true })
+  await rename(match.path, join(archiveDir, match.entry))
+  return true
+}
+
+export async function restoreFragmentMarkdown(dataDir: string, storyId: string, fragmentId: string): Promise<boolean> {
+  const match = (await findMarkdownFragmentEntry(dataDir, storyId, fragmentId, { includeArchived: true, onlyArchived: true }))[0]
+  if (!match) return false
+
+  const targetDir = join(getMarkdownStoryRoot(dataDir, storyId), match.folder)
+  await rename(match.path, join(targetDir, match.entry))
+  return true
 }

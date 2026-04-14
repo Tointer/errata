@@ -61,7 +61,6 @@ describe('FragmentSchema', () => {
     expect(result.sticky).toBe(false)
     expect(result.order).toBe(0)
     expect(result.meta).toEqual({})
-    expect(result.archived).toBe(false)
     expect(result.version).toBe(1)
     expect(result.versions).toEqual([])
   })

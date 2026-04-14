@@ -46,7 +46,6 @@ function makeFragment(id: string, overrides?: Partial<Fragment>): Fragment {
     updatedAt: now,
     order: 0,
     meta: {},
-    archived: false,
     version: 1,
     versions: [],
     ...overrides,

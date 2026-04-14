@@ -251,7 +251,7 @@ describe('Fragment API routes', () => {
       method: 'DELETE',
     })
     expect(res.status).toBe(200)
-    const listRes = await api(`/stories/${storyId}/fragments?includeArchived=true`)
+    const listRes = await api(`/stories/${storyId}/fragments/archived`)
     const data = await listRes.json()
     expect(data).toHaveLength(0)
   })
@@ -264,17 +264,15 @@ describe('Fragment API routes', () => {
       method: 'POST',
     })
     expect(res.status).toBe(200)
-    const data = await res.json()
-    expect(data.archived).toBe(true)
     // Fragment should not appear in normal list
     const listRes = await api(`/stories/${storyId}/fragments`)
     const listData = await listRes.json()
     expect(listData).toHaveLength(0)
-    // But should appear with includeArchived
-    const archivedRes = await api(`/stories/${storyId}/fragments?includeArchived=true`)
+    // But should appear in archived listing
+    const archivedRes = await api(`/stories/${storyId}/fragments/archived`)
     const archivedData = await archivedRes.json()
     expect(archivedData).toHaveLength(1)
-    expect(archivedData[0].archived).toBe(true)
+    expect(archivedData[0].id).toBe(created.id)
   })
 
   it('POST /api/stories/:sid/fragments/:fid/restore restores a fragment', async () => {
@@ -285,8 +283,6 @@ describe('Fragment API routes', () => {
     await api(`/stories/${storyId}/fragments/${created.id}/archive`, { method: 'POST' })
     const res = await api(`/stories/${storyId}/fragments/${created.id}/restore`, { method: 'POST' })
     expect(res.status).toBe(200)
-    const data = await res.json()
-    expect(data.archived).toBe(false)
     // Should appear in normal list again
     const listRes = await api(`/stories/${storyId}/fragments`)
     const listData = await listRes.json()

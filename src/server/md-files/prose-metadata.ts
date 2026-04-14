@@ -17,7 +17,6 @@ export interface ProseFragmentInternalRecord {
   updatedAt: string
   order: number
   meta: Record<string, unknown>
-  archived: boolean
 }
 
 function parseLegacyGeneratedFrom(attributes: Record<string, unknown>): string | undefined {
@@ -111,7 +110,6 @@ export function buildProseInternalRecord(fragment: Fragment): ProseFragmentInter
     updatedAt: fragment.updatedAt,
     order: fragment.order,
     meta: internalMeta,
-    archived: fragment.archived ?? false,
   }
 }
 
@@ -139,7 +137,6 @@ export function proseFragmentFromMarkdown(
       updatedAt: internalRecord.updatedAt,
       order: internalRecord.order,
       meta: mergeVisibleProseMeta(internalRecord.meta, markdownMeta),
-      archived: internalRecord.archived,
       version: 1,
       versions: [],
     }
@@ -170,7 +167,6 @@ export function proseFragmentFromMarkdown(
     updatedAt: now,
     order: 0,
     meta: mergeVisibleProseMeta({}, markdownMeta),
-    archived: false,
     version: 1,
     versions: [],
   }

@@ -4,11 +4,13 @@ import {
   createFragment,
   getFragment,
   listFragments,
+  listArchivedFragments,
   updateFragment,
   updateFragmentVersioned,
   deleteFragment,
   archiveFragment,
   restoreFragment,
+  isFragmentArchived,
   listFragmentVersions,
   revertFragmentToVersion,
 } from '../fragments/storage'
@@ -66,7 +68,6 @@ export function fragmentRoutes(dataDir: string) {
         placement: 'user',
         createdAt: now,
         updatedAt: now,
-        archived: false,
         order: 0,
         meta: body.meta ?? {},
         version: 1,
@@ -89,9 +90,13 @@ export function fragmentRoutes(dataDir: string) {
 
     .get('/stories/:storyId/fragments', async ({ params, query }) => {
       const type = query.type as string | undefined
-      const includeArchived = (query as Record<string, string>).includeArchived === 'true'
-      return listFragments(dataDir, params.storyId, type, { includeArchived })
+      return listFragments(dataDir, params.storyId, type)
     }, { detail: { summary: 'List fragments, optionally filtered by type' } })
+
+    .get('/stories/:storyId/fragments/archived', async ({ params, query }) => {
+      const type = query.type as string | undefined
+      return listArchivedFragments(dataDir, params.storyId, type)
+    }, { detail: { summary: 'List archived fragments' } })
 
     .get('/stories/:storyId/fragments/:fragmentId', async ({ params, set }) => {
       const fragment = await getFragment(
@@ -213,7 +218,7 @@ export function fragmentRoutes(dataDir: string) {
         set.status = 404
         return { error: 'Fragment not found' }
       }
-      const isArchived = Boolean((fragment as Fragment & { archived?: boolean }).archived)
+      const isArchived = await isFragmentArchived(dataDir, params.storyId, params.fragmentId)
       if (!isArchived) {
         set.status = 422
         return { error: 'Fragment must be archived before deletion' }

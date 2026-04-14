@@ -6,11 +6,15 @@ export {
 } from './paths'
 
 export {
+  archiveFragmentMarkdown,
   deleteFragmentMarkdown,
   ensureMarkdownStoryLayout,
+  isMarkdownFragmentArchived,
+  listArchivedMarkdownFragments,
   listMarkdownFragments,
   loadMarkdownFragmentById,
   loadMarkdownStoryMeta,
+  restoreFragmentMarkdown,
   syncCompiledStoryFromCurrentChain,
   syncFragmentMarkdown,
   syncProseMarkdownOrder,

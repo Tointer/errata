@@ -134,7 +134,6 @@ export async function applyFragmentSuggestion(args: {
     placement: 'user',
     createdAt: now,
     updatedAt: now,
-    archived: false,
     order: 0,
     meta: {
       source: 'librarian-suggestion',
