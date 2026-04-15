@@ -159,6 +159,11 @@ export function AgentConfigurePanel({ storyId }: AgentConfigurePanelProps) {
     queryFn: () => api.agentBlocks.list(),
   })
 
+  const { data: story } = useQuery({
+    queryKey: ['story', storyId],
+    queryFn: () => api.stories.get(storyId),
+  })
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center py-24">
@@ -186,7 +191,11 @@ export function AgentConfigurePanel({ storyId }: AgentConfigurePanelProps) {
     )
   }
 
-  const groups = groupAgents(agents)
+  const generationMode = story?.settings.generationMode ?? 'standard'
+  const visibleAgents = generationMode === 'prewriter'
+    ? agents
+    : agents.filter((a) => a.agentName !== 'generation.prewriter')
+  const groups = groupAgents(visibleAgents)
 
   return (
     <div className="flex h-full min-h-0 flex-col">
