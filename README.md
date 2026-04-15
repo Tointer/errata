@@ -1,156 +1,41 @@
 # Errata
 
-An LLM assisted writing app built around a fragment system. Prose, characters, guidelines, and knowledge are composable fragments that assemble into structured LLM context for story generation.
+This repository is a fork of the original [Errata](https://github.com/nokusukun/errata). The goal of this fork is not to redesign the core writing model, but to push Errata toward a filesystem-first workflow where story data is readable, movable, and configurable from markdown files.
 
-Join the community on Discord: https://discord.gg/ywVFKvdH49
+## What Is Different In This Fork
 
-![Main editor view](docs/imgs/initial-view.png)
+The original app's core ideas are still here: fragment-based writing, block-driven context assembly, plugin support, and model-assisted prose workflows. The main differences are in storage, packaging, and product direction.
 
-## Features
+### Filesystem-first story storage
 
-- **Fragment system** — everything is a fragment with tags, refs, sticky/system placement, and version history
-- **Prose chain + writing panel** — branchable prose with regenerate/refine/switch/remove, selection transforms (rewrite/expand/compress), and a dedicated long-form editor view
-- **Two-phase prewriter** — optional planner agent distills full context into a focused writing brief before the writer generates, keeping output grounded while reducing token waste
-- **Per-role model selection** — assign different providers and models to generation, librarian, character chat, directions, and individual agents with automatic fallback chains
-- **Model-specific instructions** — drop JSON files to override any system prompt per model family (exact match or regex), so you can tune prompts for DeepSeek vs Anthropic vs OpenAI
-- **Story direction suggestions** — AI-generated "what happens next?" options with customizable prompt templates and guided direction mode
-- **Character Chat mode** — story-scoped chat with streaming responses, provider/model selection, and character portraits
-- **Block-based context** — visual editor for reordering, overriding, and extending LLM prompt structure, including JavaScript-powered script blocks with live preview
-- **Agent context panel** — per-agent block editor for customizing any agent's prompt, disabling tools, and setting model overrides
-- **Librarian memory tools** — rolling continuity, hierarchical summaries, contradiction tracking, and summary compaction controls
-- **Universal import/export** — drag-and-drop JSON, bundle ZIPs, and SillyTavern/Tavern cards (PNG/JSON with lorebook support)
-- **Story cover images** — cover art with gallery grid layout on the story list
-- **Plugin system** — bundled + external runtime plugins with iframe UI panels
-- **Onboarding wizard + in-app help** — first-run setup flow and contextual help articles
-- **Custom CSS** — user-defined styling for theming the interface
-- **No database** — filesystem storage, compiles to a single binary
+This fork treats the filesystem as the source of truth.
 
-### Story Wizard
+- Story content, llms guidelines, character cards, lore fragments is synced to markdown files instead of living in internal storage.
+- Story settings and metadata are preserved in markdown/frontmatter.
+- Human-facing content is kept in visible folders.
+- App-only internal state is pushed under `.errata/` so the story root stays understandable.
 
-Set up a new story with guidelines, characters, and knowledge in one flow.
+Current story layout is  shaped around editable files:
 
-![Story wizard](docs/imgs/story-wizard.png)
-
-### Characters & Fragments
-
-Browse and edit fragments in the sidebar. Characters, guidelines, and knowledge all work the same way.
-
-![Character panel](docs/imgs/character-panel.png)
-
-### Debug Panel
-
-Inspect the full LLM prompt, tool calls, and token usage for any generation.
-
-![Debug panel](docs/imgs/debug-window.png)
-
-### Character Chat
-
-Switch from prose view to Character Chat to run in-world conversations with your configured providers and saved chat history.
-
-## Quick Start
-
-```bash
-git clone https://github.com/tealios/errata.git
-cd errata
-bun install
-bun run dev
+```text
+<vault>/stories/<story-id>/
+	story.md
+	Guidelines/
+	Characters/
+	Lorebook/
+	Prose/
+	.errata/
 ```
 
-Open `http://localhost:7739`. Configure an LLM provider in the onboarding wizard or Settings > Providers.
+### Why
+Mostly because I want to use it alongside obsidian. Now I can create errata vault inside obsidian vault, making it convenient to move text from obsidian "idea space" to errata files and back.
 
-## Development
+On top of that, its more friendly to outside ai agents, since they can now do things to the story by just reading .md files
 
-One-click setup on Windows -- installs Git and Bun if needed, clones/pulls the repo, installs dependencies, and starts the dev server:
+### Sacrifices
+- no more native story branches, but you can duplicate story folder to get similar result
+- fragments can't be marked as archived, instead you can hide them in subfolders
+- to get filesystem access, project was ported to the electron, forcing me to remove bun and use node instead
 
-```powershell
-powershell -ExecutionPolicy Bypass -File scripts/setup.ps1
-```
 
-Or run it directly from the web without cloning first:
 
-```powershell
-irm https://raw.githubusercontent.com/tealios/errata/master/scripts/setup.ps1 | iex
-```
-
-## Download
-
-Pre-built binaries are available on the [Releases](https://github.com/tealios/errata/releases) page for Windows, Linux, and macOS. Extract the zip and run — no runtime dependencies required.
-
-```bash
-# Windows
-errata.exe
-
-# Linux
-chmod +x errata
-./errata
-
-# macOS — remove quarantine attribute first
-xattr -cr errata
-chmod +x errata
-./errata
-```
-
-Set `DATA_DIR` to control where story data is stored (default: `./data`).
-
-## Environment Variables
-
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `DATA_DIR` | `./data` | Story data directory |
-| `PORT` | `7739` | Server port |
-| `PLUGIN_DIR` | — | External plugin directory |
-
-LLM providers can also be configured in the UI under Settings > Providers.
-
-## Scripts
-
-```bash
-bun run dev              # Development server
-bun run build            # Production build
-bun run test             # Run tests
-bun run new:plugin       # Scaffold a plugin from template
-bun run build:binary     # Compile to standalone binary
-bun run release:binary   # Build + package zip bundle
-```
-
-## Project Layout
-
-```
-src/                    App code (routes, server, components, lib)
-  server/               Elysia API, fragments, blocks, LLM, agents, librarian
-  components/           React UI (prose, fragments, blocks, generation, sidebar)
-  lib/api/              Typed frontend API client
-plugins/                Bundled plugins (diceroll, keybinds, names) + templates
-packages/               Plugin SDK (@tealios/errata-plugin-sdk)
-tests/                  Vitest suites
-docs/                   Documentation
-```
-
-## Stack
-
-Bun, TanStack Start + React 19, Elysia, Zod v4, Vercel AI SDK v6, Tailwind v4 + shadcn/ui, Vitest.
-
-## Plugins
-
-Plugins can register fragment types, LLM tools, API routes, and pipeline hooks. External plugins are loaded from `PLUGIN_DIR` at runtime with iframe-based UI panels.
-
-- [Plugin authoring guide](docs/third-party-plugins.md)
-- [Runtime plugins + binary packaging](docs/runtime-plugins-and-binary-packaging.md)
-- [Plugin templates](plugins/templates/README.md)
-- SDK: `@tealios/errata-plugin-sdk`
-
-## Documentation
-
-- [Architecture & data model](PLAN.md)
-- [Generation pipeline](docs/generation-pipeline.md)
-- [Context block system](docs/context-blocks.md)
-- [Instruction registry](docs/instruction-registry.md)
-- [Character Chat](docs/character-chat.md)
-- [Prose Writing Panel](docs/prose-writing-panel.md)
-- [Component ID contract](docs/component-ids.md)
-- [Publishing the plugin SDK](docs/publishing-plugin-sdk.md)
-- [Full docs index](docs/README.md)
-
----
-
-Built by [nokusukun](https://github.com/nokusukun)
