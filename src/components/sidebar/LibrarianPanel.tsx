@@ -3,6 +3,7 @@ import { useQuery, useQueryClient, useMutation } from '@tanstack/react-query'
 import {
   api,
   type ConversationMeta,
+  type Fragment,
   type LibrarianAnalysis,
   type LibrarianAnalysisSummary,
   type LibrarianState,
@@ -14,6 +15,8 @@ import { Textarea } from '@/components/ui/textarea'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
 import {
   AlertTriangle,
+  Archive,
+  ArchiveRestore,
   Brain,
   Lightbulb,
   Clock,
@@ -26,6 +29,7 @@ import {
   Wrench,
   MessageSquare,
   BookOpen,
+  Bookmark,
   Trash2,
   ArrowLeft,
   X,
@@ -359,6 +363,9 @@ function StoryContent({ storyId, status, onOpenChat }: LibrarianPanelProps & { s
             </div>
           </section>
         )}
+
+        {/* Summary fragments — maintained by the librarian, editable by the writer */}
+        <SummariesSection storyId={storyId} />
 
         {/* Recent analyses with inline findings */}
         {analyses && analyses.length > 0 && (
@@ -977,5 +984,230 @@ function TraceItem({ item }: { item: CollapsedTraceItem }) {
   }
 
   return null
+}
+
+// ── Summaries section ─────────────────────────────────────────
+
+function SummariesSection({ storyId }: { storyId: string }) {
+  const [expanded, setExpanded] = useState(true)
+  const [showArchived, setShowArchived] = useState(false)
+  const [editingId, setEditingId] = useState<string | null>(null)
+
+  const { data: summaries } = useQuery({
+    queryKey: ['fragments', storyId, 'summary'],
+    queryFn: () => api.fragments.list(storyId, 'summary'),
+    refetchInterval: 5000,
+  })
+
+  const { data: archivedSummaries } = useQuery({
+    queryKey: ['fragments-archived', storyId, 'summary'],
+    queryFn: async () => {
+      const all = await api.fragments.listArchived(storyId)
+      return all.filter(f => f.type === 'summary')
+    },
+    enabled: showArchived,
+  })
+
+  const sorted = useMemo(() => {
+    if (!summaries) return []
+    return [...summaries].sort((a, b) => {
+      const aEra = a.meta?.isEraSummary ? 0 : 1
+      const bEra = b.meta?.isEraSummary ? 0 : 1
+      if (aEra !== bEra) return aEra - bEra
+      return a.createdAt.localeCompare(b.createdAt)
+    })
+  }, [summaries])
+
+  if (!summaries || summaries.length === 0) {
+    return null
+  }
+
+  return (
+    <section>
+      <button
+        className="w-full flex items-center gap-2 py-1.5 px-0.5 text-left"
+        onClick={() => setExpanded(e => !e)}
+      >
+        {expanded
+          ? <ChevronDown className="size-3 text-muted-foreground/60" />
+          : <ChevronRight className="size-3 text-muted-foreground/60" />
+        }
+        <span className="text-[0.625rem] text-muted-foreground uppercase tracking-[0.15em] font-medium">
+          Summaries
+        </span>
+        <span className="text-[0.625rem] text-muted-foreground/60 tabular-nums">
+          {summaries.length}
+        </span>
+      </button>
+      {expanded && (
+        <div className="space-y-1.5 mt-1">
+          {sorted.map(fragment => (
+            <SummaryRow
+              key={fragment.id}
+              storyId={storyId}
+              fragment={fragment}
+              editing={editingId === fragment.id}
+              onEdit={() => setEditingId(fragment.id)}
+              onCancelEdit={() => setEditingId(null)}
+            />
+          ))}
+          <button
+            onClick={() => setShowArchived(s => !s)}
+            className="text-[0.625rem] font-display italic text-muted-foreground/70 hover:text-foreground transition-colors px-1"
+          >
+            {showArchived ? 'hide archived' : 'show archived'}
+          </button>
+          {showArchived && archivedSummaries && archivedSummaries.length > 0 && (
+            <div className="space-y-1.5 pt-1 opacity-70">
+              {archivedSummaries.map(fragment => (
+                <SummaryRow
+                  key={fragment.id}
+                  storyId={storyId}
+                  fragment={fragment}
+                  editing={editingId === fragment.id}
+                  onEdit={() => setEditingId(fragment.id)}
+                  onCancelEdit={() => setEditingId(null)}
+                  archived
+                />
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+    </section>
+  )
+}
+
+function SummaryRow({
+  storyId,
+  fragment,
+  editing,
+  onEdit,
+  onCancelEdit,
+  archived = false,
+}: {
+  storyId: string
+  fragment: Fragment
+  editing: boolean
+  onEdit: () => void
+  onCancelEdit: () => void
+  archived?: boolean
+}) {
+  const queryClient = useQueryClient()
+  const [draft, setDraft] = useState(fragment.content)
+
+  useEffect(() => {
+    setDraft(fragment.content)
+  }, [fragment.content])
+
+  const chapterId = (fragment.meta?.chapterId as string | null | undefined) ?? null
+  const isEra = !!fragment.meta?.isEraSummary
+
+  const invalidate = () => {
+    queryClient.invalidateQueries({ queryKey: ['fragments', storyId, 'summary'] })
+    queryClient.invalidateQueries({ queryKey: ['fragments-archived', storyId, 'summary'] })
+  }
+
+  const saveMutation = useMutation({
+    mutationFn: (content: string) =>
+      api.fragments.update(storyId, fragment.id, {
+        name: fragment.name,
+        description: fragment.description,
+        content,
+      }),
+    onSuccess: () => {
+      invalidate()
+      onCancelEdit()
+    },
+  })
+
+  const archiveMutation = useMutation({
+    mutationFn: () => api.fragments.archive(storyId, fragment.id),
+    onSuccess: invalidate,
+  })
+
+  const restoreMutation = useMutation({
+    mutationFn: () => api.fragments.restore(storyId, fragment.id),
+    onSuccess: invalidate,
+  })
+
+  return (
+    <div className="rounded-md border border-border/30 bg-muted/10 p-2 space-y-1.5">
+      <div className="flex items-start gap-2">
+        <Bookmark className={`size-3 mt-0.5 shrink-0 ${isEra ? 'text-primary/60' : 'text-muted-foreground/60'}`} />
+        <div className="flex-1 min-w-0">
+          <p className="text-[0.75rem] font-medium truncate leading-tight">{fragment.name}</p>
+          <div className="flex items-center gap-1.5 mt-0.5 text-[0.5625rem] text-muted-foreground uppercase tracking-[0.1em]">
+            {isEra && <span>era</span>}
+            {isEra && <span aria-hidden className="text-muted-foreground/40">·</span>}
+            <span className="tabular-nums normal-case tracking-normal">{fragment.content.length} chars</span>
+            {chapterId && (
+              <>
+                <span aria-hidden className="text-muted-foreground/40">·</span>
+                <span className="font-mono normal-case tracking-normal text-muted-foreground/60">{chapterId}</span>
+              </>
+            )}
+          </div>
+        </div>
+        <div className="flex items-center gap-0.5 shrink-0">
+          {archived ? (
+            <button
+              onClick={() => restoreMutation.mutate()}
+              disabled={restoreMutation.isPending}
+              aria-label="Restore summary"
+              className="p-1 rounded text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors"
+            >
+              <ArchiveRestore className="size-3" />
+            </button>
+          ) : (
+            <button
+              onClick={() => archiveMutation.mutate()}
+              disabled={archiveMutation.isPending}
+              aria-label="Archive summary"
+              className="p-1 rounded text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors"
+            >
+              <Archive className="size-3" />
+            </button>
+          )}
+        </div>
+      </div>
+
+      {editing ? (
+        <div className="space-y-1.5">
+          <Textarea
+            value={draft}
+            onChange={e => setDraft(e.target.value)}
+            className="min-h-[120px] text-[0.75rem] font-prose leading-relaxed resize-y border-border/40"
+            autoFocus
+          />
+          <div className="flex justify-end gap-1.5">
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-6 text-[0.6875rem]"
+              onClick={() => { setDraft(fragment.content); onCancelEdit() }}
+            >
+              Cancel
+            </Button>
+            <Button
+              size="sm"
+              className="h-6 text-[0.6875rem]"
+              onClick={() => saveMutation.mutate(draft)}
+              disabled={saveMutation.isPending || draft === fragment.content}
+            >
+              {saveMutation.isPending ? 'Saving…' : 'Save'}
+            </Button>
+          </div>
+        </div>
+      ) : (
+        <button
+          onClick={onEdit}
+          className="w-full text-left text-[0.6875rem] font-prose text-foreground/70 leading-relaxed whitespace-pre-wrap line-clamp-4 hover:text-foreground/90 transition-colors"
+        >
+          {fragment.content || <span className="italic text-muted-foreground/40">(empty)</span>}
+        </button>
+      )}
+    </div>
+  )
 }
 
