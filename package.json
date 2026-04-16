@@ -110,6 +110,7 @@
       "main": "electron/main.mjs"
     },
     "win": {
+      "icon": "public/favicon.ico",
       "signAndEditExecutable": false,
       "target": [
         {

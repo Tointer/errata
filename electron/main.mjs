@@ -12,6 +12,7 @@ const isDev = Boolean(rendererUrl)
 const backendOrigin = process.env.ERRATA_API_ORIGIN ?? 'http://127.0.0.1:7739'
 const backendUrl = new URL(backendOrigin)
 const preloadPath = join(__dirname, 'preload.mjs')
+const appIconPath = join(appRoot, 'public', 'favicon.ico')
 const DESKTOP_STATE_FILE = 'desktop-state.json'
 const VAULT_META_DIR = '.errata'
 const STORIES_DIR_NAME = 'stories'
@@ -603,6 +604,7 @@ async function createMainWindow() {
       height: 960,
       minWidth: 1200,
       minHeight: 760,
+      icon: appIconPath,
       backgroundColor: '#0f1412',
       show: false,
       autoHideMenuBar: true,
