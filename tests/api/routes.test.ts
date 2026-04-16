@@ -372,6 +372,7 @@ describe('Fragment types route', () => {
       'knowledge',
       'marker',
       'prose',
+      'summary',
     ])
   })
 })

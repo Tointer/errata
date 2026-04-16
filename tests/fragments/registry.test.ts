@@ -22,6 +22,7 @@ describe('FragmentTypeRegistry', () => {
       'knowledge',
       'marker',
       'prose',
+      'summary',
     ])
   })
 
