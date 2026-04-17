@@ -180,7 +180,68 @@ describe('md-files repository sync', () => {
       expect(loaded?.type).toBe('guideline')
       expect(loaded?.name).toBe('Scene Discipline')
       expect(loaded?.sticky).toBe(true)
+      expect(loaded?.meta.frozenSections).toEqual([
+        { id: 'fs-md-leading', text: 'Keep every scene tight and specific.' },
+      ])
       expect(loaded?.content).toBe('Keep every scene tight and specific.')
+    } finally {
+      await tmp.cleanup()
+    }
+  })
+
+  it('treats markdown before the editable delimiter as frozen content', async () => {
+    const tmp = await createTempDir()
+
+    try {
+      const story = makeStory('story-editable-delimiter')
+      await createStory(tmp.path, story)
+
+      const guidelinePath = join(getMarkdownStoryRoot(tmp.path, story.id), 'Guidelines', 'Voice.md')
+      await writeFile(
+        guidelinePath,
+        [
+          'Keep the diction precise.',
+          '',
+          '<!-- editable -->',
+          '',
+          'Recent scene note: lean harder into suspicion.',
+        ].join('\n'),
+        'utf-8',
+      )
+
+      const loaded = await loadMarkdownFragmentById(tmp.path, story.id, 'gl-voice')
+      expect(loaded?.content).toBe('Keep the diction precise.\n\nRecent scene note: lean harder into suspicion.')
+      expect(loaded?.meta.frozenSections).toEqual([
+        { id: 'fs-md-leading', text: 'Keep the diction precise.' },
+      ])
+    } finally {
+      await tmp.cleanup()
+    }
+  })
+
+  it('writes the editable delimiter back to markdown when a leading frozen section exists', async () => {
+    const tmp = await createTempDir()
+
+    try {
+      const story = makeStory('story-leading-freeze-save')
+      await createStory(tmp.path, story)
+
+      await createFragment(tmp.path, story.id, makeFragment('gl-voice', {
+        type: 'guideline',
+        name: 'Voice',
+        description: 'House voice',
+        content: 'Keep the diction precise.\n\nRecent scene note: lean harder into suspicion.',
+        sticky: true,
+        meta: {
+          frozenSections: [{ id: 'fs-md-leading', text: 'Keep the diction precise.' }],
+        },
+      }))
+
+      const raw = await readFile(join(getMarkdownStoryRoot(tmp.path, story.id), 'Guidelines', 'Voice.md'), 'utf-8')
+      expect(raw).toContain('<!-- editable -->')
+      expect(raw).toContain('Keep the diction precise.')
+      expect(raw).toContain('Recent scene note: lean harder into suspicion.')
+      expect(raw).not.toContain('"fs-md-leading"')
     } finally {
       await tmp.cleanup()
     }

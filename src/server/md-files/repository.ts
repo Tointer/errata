@@ -30,15 +30,21 @@ import {
 import { serializeStoryMeta, storyMetaFromMarkdown } from './story-meta'
 import { registry } from '../fragments/registry'
 import { createLogger } from '../logging/logger'
+import { getFrozenSections, type FrozenSection } from '../fragments/protection'
 
 const repositoryLogger = createLogger('md-repository')
+const MARKDOWN_EDITABLE_DELIMITER = '<!-- editable -->'
+const MARKDOWN_LEADING_FROZEN_SECTION_ID = 'fs-md-leading'
 
 function optionalList<T>(value: T[]): T[] | undefined {
   return value.length > 0 ? value : undefined
 }
 
 function optionalRecord(value: Record<string, unknown>): Record<string, unknown> | undefined {
-  return Object.keys(value).length > 0 ? value : undefined
+  const filtered = Object.fromEntries(
+    Object.entries(value).filter(([, entryValue]) => entryValue !== undefined),
+  )
+  return Object.keys(filtered).length > 0 ? filtered : undefined
 }
 
 function resolveSticky(type: string, attributes: Record<string, unknown>): boolean {
@@ -46,11 +52,133 @@ function resolveSticky(type: string, attributes: Record<string, unknown>): boole
   return registry.getType(type)?.stickyByDefault ?? false
 }
 
+function supportsMarkdownLeadingFreeze(type: string): boolean {
+  return type === 'character' || type === 'guideline' || type === 'knowledge'
+}
+
+function dedupeFrozenSections(sections: FrozenSection[]): FrozenSection[] {
+  const seen = new Set<string>()
+  const result: FrozenSection[] = []
+
+  for (const section of sections) {
+    const key = `${section.id}\u0000${section.text}`
+    if (seen.has(key)) continue
+    seen.add(key)
+    result.push(section)
+  }
+
+  return result
+}
+
+function combineBodyParts(frozenPart: string, editablePart: string): string {
+  if (frozenPart && editablePart) return `${frozenPart}\n\n${editablePart}`
+  return frozenPart || editablePart
+}
+
+function splitMarkdownEditableBody(body: string): {
+  content: string
+  leadingFrozenText: string | null
+} {
+  const normalized = body.replace(/\r\n/g, '\n')
+  const lines = normalized.split('\n')
+  const delimiterIndex = lines.findIndex((line) => line.trim() === MARKDOWN_EDITABLE_DELIMITER)
+
+  if (delimiterIndex === -1) {
+    return {
+      content: normalized,
+      leadingFrozenText: normalized.trim().length > 0 ? normalized : null,
+    }
+  }
+
+  const frozenPart = lines.slice(0, delimiterIndex).join('\n').replace(/\n+$/g, '')
+  const editablePart = lines.slice(delimiterIndex + 1).join('\n').replace(/^\n+/g, '')
+
+  return {
+    content: combineBodyParts(frozenPart, editablePart),
+    leadingFrozenText: frozenPart.length > 0 ? frozenPart : null,
+  }
+}
+
+function extractMarkdownFrozenMeta(type: string, body: string, meta: Record<string, unknown>): {
+  content: string
+  meta: Record<string, unknown>
+} {
+  if (!supportsMarkdownLeadingFreeze(type)) {
+    return { content: body, meta }
+  }
+
+  const { content, leadingFrozenText } = splitMarkdownEditableBody(body)
+  const existingSections = getFrozenSections(meta)
+  const leadingSection = leadingFrozenText
+    ? [{ id: MARKDOWN_LEADING_FROZEN_SECTION_ID, text: leadingFrozenText } satisfies FrozenSection]
+    : []
+  const frozenSections = dedupeFrozenSections([
+    ...leadingSection,
+    ...existingSections.filter((section) => section.id !== MARKDOWN_LEADING_FROZEN_SECTION_ID),
+  ])
+
+  return {
+    content,
+    meta: frozenSections.length > 0
+      ? { ...meta, frozenSections }
+      : { ...meta, frozenSections: undefined },
+  }
+}
+
+function findLeadingFrozenSection(type: string, fragment: Fragment): FrozenSection | null {
+  if (!supportsMarkdownLeadingFreeze(type)) return null
+
+  const sections = getFrozenSections(fragment.meta)
+  let best: FrozenSection | null = null
+
+  for (const section of sections) {
+    if (!fragment.content.startsWith(section.text)) continue
+    if (!best || section.text.length > best.text.length) {
+      best = section
+    }
+  }
+
+  return best
+}
+
+function splitFrontmatterMetaForMarkdown(type: string, fragment: Fragment): {
+  body: string
+  frontmatterMeta: Record<string, unknown>
+} {
+  const leadingFrozen = findLeadingFrozenSection(type, fragment)
+  const sections = getFrozenSections(fragment.meta)
+  const remainingFrozenSections = leadingFrozen
+    ? sections.filter((section) => section.id !== leadingFrozen.id || section.text !== leadingFrozen.text)
+    : sections
+
+  const frontmatterMeta: Record<string, unknown> = {
+    ...fragment.meta,
+    frozenSections: remainingFrozenSections.length > 0 ? remainingFrozenSections : undefined,
+  }
+
+  if (!leadingFrozen || leadingFrozen.text === fragment.content) {
+    return {
+      body: fragment.content,
+      frontmatterMeta,
+    }
+  }
+
+  const editablePart = fragment.content.slice(leadingFrozen.text.length).replace(/^\n+/g, '')
+  return {
+    body: editablePart.length > 0
+      ? `${leadingFrozen.text.replace(/\n+$/g, '')}\n\n${MARKDOWN_EDITABLE_DELIMITER}\n\n${editablePart}`
+      : leadingFrozen.text,
+    frontmatterMeta,
+  }
+}
+
 function serializeFragment(fragment: Fragment): string {
   if (fragment.type === 'prose') {
     const { markdownMeta } = splitProseInternalMeta(fragment.meta)
     return serializeFrontmatter(markdownMeta, fragment.content)
   }
+
+  const { body, frontmatterMeta } = splitFrontmatterMetaForMarkdown(fragment.type, fragment)
 
   if (isVisibleFilenameDerivedType(fragment.type)) {
     return serializeFrontmatter(
@@ -61,9 +189,9 @@ function serializeFragment(fragment: Fragment): string {
         sticky: fragment.sticky,
         placement: fragment.placement,
         order: fragment.order,
-        meta: optionalRecord(fragment.meta),
+        meta: optionalRecord(frontmatterMeta),
       },
-      fragment.content,
+      body,
     )
   }
 
@@ -78,9 +206,9 @@ function serializeFragment(fragment: Fragment): string {
       sticky: fragment.sticky,
       placement: fragment.placement,
       order: fragment.order,
-      meta: optionalRecord(fragment.meta),
+      meta: optionalRecord(frontmatterMeta),
     },
-    fragment.content,
+    body,
   )
 }
 
@@ -91,12 +219,16 @@ function fragmentFromLegacyMarkdown(
 ): Fragment | null {
   if (typeof attributes.id !== 'string' || typeof attributes.type !== 'string') return null
   const timestamps = resolveFragmentTimestamps(attributes, internalRecord)
+  const rawMeta = typeof attributes.meta === 'object' && attributes.meta !== null
+    ? attributes.meta as Record<string, unknown>
+    : {}
+  const bodyFreeze = extractMarkdownFrozenMeta(attributes.type, body, rawMeta)
   return {
     id: attributes.id,
     type: attributes.type,
     name: typeof attributes.name === 'string' ? attributes.name : attributes.id,
     description: typeof attributes.description === 'string' ? attributes.description : '',
-    content: body,
+    content: bodyFreeze.content,
     tags: Array.isArray(attributes.tags) ? attributes.tags.filter((value): value is string => typeof value === 'string') : [],
     refs: Array.isArray(attributes.refs) ? attributes.refs.filter((value): value is string => typeof value === 'string') : [],
     sticky: resolveSticky(attributes.type, attributes),
@@ -104,7 +236,7 @@ function fragmentFromLegacyMarkdown(
     createdAt: timestamps.createdAt,
     updatedAt: timestamps.updatedAt,
     order: typeof attributes.order === 'number' ? attributes.order : 0,
-    meta: typeof attributes.meta === 'object' && attributes.meta !== null ? attributes.meta as Record<string, unknown> : {},
+    meta: bodyFreeze.meta,
     version: 1,
     versions: [],
   }
@@ -119,12 +251,16 @@ function visibleFragmentFromMarkdown(
 ): Fragment {
   const baseName = fileName.replace(/\.md$/i, '')
   const timestamps = resolveFragmentTimestamps(attributes, internalRecord)
+  const rawMeta = typeof attributes.meta === 'object' && attributes.meta !== null
+    ? attributes.meta as Record<string, unknown>
+    : {}
+  const bodyFreeze = extractMarkdownFrozenMeta(type, body, rawMeta)
   return {
     id: getFilenameDerivedFragmentId(type, fileName),
     type,
     name: baseName,
     description: typeof attributes.description === 'string' ? attributes.description : '',
-    content: body,
+    content: bodyFreeze.content,
     tags: Array.isArray(attributes.tags) ? attributes.tags.filter((value): value is string => typeof value === 'string') : [],
     refs: Array.isArray(attributes.refs) ? attributes.refs.filter((value): value is string => typeof value === 'string') : [],
     sticky: resolveSticky(type, attributes),
@@ -132,7 +268,7 @@ function visibleFragmentFromMarkdown(
     createdAt: timestamps.createdAt,
     updatedAt: timestamps.updatedAt,
     order: typeof attributes.order === 'number' ? attributes.order : 0,
-    meta: typeof attributes.meta === 'object' && attributes.meta !== null ? attributes.meta as Record<string, unknown> : {},
+    meta: bodyFreeze.meta,
     version: 1,
     versions: [],
   }
