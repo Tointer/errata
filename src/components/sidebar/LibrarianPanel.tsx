@@ -1,4 +1,5 @@
-import { useEffect, useState, useMemo } from 'react'
+import { useEffect, useState, useMemo, useRef } from 'react'
+import { createPortal } from 'react-dom'
 import { useQuery, useQueryClient, useMutation } from '@tanstack/react-query'
 import {
   api,
@@ -45,7 +46,7 @@ interface LibrarianPanelProps {
   onAskFragmentConsumed?: () => void
 }
 
-type TabValue = 'chat' | 'story'
+type TabValue = 'chat' | 'story' | 'summaries'
 
 function tabStorageKey(storyId: string): string {
   return `errata.librarian.activeTab.${storyId}`
@@ -54,7 +55,7 @@ function tabStorageKey(storyId: string): string {
 function readSavedTab(storyId: string): TabValue {
   if (typeof window === 'undefined') return 'chat'
   const saved = window.localStorage.getItem(tabStorageKey(storyId))
-  if (saved === 'story') return saved
+  if (saved === 'story' || saved === 'summaries') return saved
   return 'chat'
 }
 
@@ -132,6 +133,10 @@ export function LibrarianPanel({ storyId, askFragmentId, askPrefill, onAskFragme
             <BookOpen className="size-3" />
             Story
           </TabsTrigger>
+          <TabsTrigger value="summaries" className="text-[0.6875rem] gap-1.5 flex-1 px-1" data-component-id="librarian-tab-summaries">
+            <Bookmark className="size-3" />
+            Summaries
+          </TabsTrigger>
         </TabsList>
       </div>
 
@@ -195,6 +200,10 @@ export function LibrarianPanel({ storyId, askFragmentId, askPrefill, onAskFragme
             })
           }}
         />
+      </TabsContent>
+
+      <TabsContent value="summaries" className="flex-1 min-h-0 mt-0">
+        <SummariesTab storyId={storyId} />
       </TabsContent>
     </Tabs>
   )
@@ -364,8 +373,6 @@ function StoryContent({ storyId, status, onOpenChat }: LibrarianPanelProps & { s
           </section>
         )}
 
-        {/* Summary fragments — maintained by the librarian, editable by the writer */}
-        <SummariesSection storyId={storyId} />
 
         {/* Recent analyses with inline findings */}
         {analyses && analyses.length > 0 && (
@@ -986,10 +993,9 @@ function TraceItem({ item }: { item: CollapsedTraceItem }) {
   return null
 }
 
-// ── Summaries section ─────────────────────────────────────────
+// ── Summaries tab ────────────────────────────────────────────
 
-function SummariesSection({ storyId }: { storyId: string }) {
-  const [expanded, setExpanded] = useState(true)
+function SummariesTab({ storyId }: { storyId: string }) {
   const [showArchived, setShowArchived] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
 
@@ -1018,87 +1024,174 @@ function SummariesSection({ storyId }: { storyId: string }) {
     })
   }, [summaries])
 
-  if (!summaries || summaries.length === 0) {
-    return null
-  }
+  const editingFragment = useMemo(() => {
+    if (!editingId) return null
+    return (summaries ?? []).find(f => f.id === editingId)
+      ?? (archivedSummaries ?? []).find(f => f.id === editingId)
+      ?? null
+  }, [editingId, summaries, archivedSummaries])
 
   return (
-    <section>
-      <button
-        className="w-full flex items-center gap-2 py-1.5 px-0.5 text-left"
-        onClick={() => setExpanded(e => !e)}
-      >
-        {expanded
-          ? <ChevronDown className="size-3 text-muted-foreground/60" />
-          : <ChevronRight className="size-3 text-muted-foreground/60" />
-        }
-        <span className="text-[0.625rem] text-muted-foreground uppercase tracking-[0.15em] font-medium">
-          Summaries
-        </span>
-        <span className="text-[0.625rem] text-muted-foreground/60 tabular-nums">
-          {summaries.length}
-        </span>
-      </button>
-      {expanded && (
-        <div className="space-y-1.5 mt-1">
-          {sorted.map(fragment => (
-            <SummaryRow
-              key={fragment.id}
-              storyId={storyId}
-              fragment={fragment}
-              editing={editingId === fragment.id}
-              onEdit={() => setEditingId(fragment.id)}
-              onCancelEdit={() => setEditingId(null)}
+    <ScrollArea className="h-full">
+      <div className="px-4 py-3 space-y-3">
+        {!summaries || summaries.length === 0 ? (
+          <div className="pt-6">
+            <EmptyState
+              icon={<Bookmark className="size-5" />}
+              title="No summaries yet"
+              hint="The librarian will record a rolling summary here as you write. Generate prose to give it something to summarize."
+              variant="panel"
             />
-          ))}
-          <button
-            onClick={() => setShowArchived(s => !s)}
-            className="text-[0.625rem] font-display italic text-muted-foreground/70 hover:text-foreground transition-colors px-1"
-          >
-            {showArchived ? 'hide archived' : 'show archived'}
-          </button>
-          {showArchived && archivedSummaries && archivedSummaries.length > 0 && (
-            <div className="space-y-1.5 pt-1 opacity-70">
-              {archivedSummaries.map(fragment => (
-                <SummaryRow
+          </div>
+        ) : (
+          <>
+            <div className="space-y-1.5">
+              {sorted.map(fragment => (
+                <SummaryCard
                   key={fragment.id}
                   storyId={storyId}
                   fragment={fragment}
-                  editing={editingId === fragment.id}
-                  onEdit={() => setEditingId(fragment.id)}
-                  onCancelEdit={() => setEditingId(null)}
-                  archived
+                  onOpen={() => setEditingId(fragment.id)}
                 />
               ))}
             </div>
-          )}
-        </div>
+
+            <div className="pt-1">
+              <button
+                onClick={() => setShowArchived(s => !s)}
+                className="text-[0.6875rem] font-display italic text-muted-foreground/70 hover:text-foreground transition-colors px-1"
+              >
+                {showArchived ? 'hide archived' : 'show archived'}
+              </button>
+              {showArchived && archivedSummaries && archivedSummaries.length > 0 && (
+                <div className="space-y-1.5 pt-2 opacity-75">
+                  {archivedSummaries.map(fragment => (
+                    <SummaryCard
+                      key={fragment.id}
+                      storyId={storyId}
+                      fragment={fragment}
+                      onOpen={() => setEditingId(fragment.id)}
+                      archived
+                    />
+                  ))}
+                </div>
+              )}
+            </div>
+          </>
+        )}
+      </div>
+
+      {editingFragment && (
+        <FullscreenSummaryEditor
+          storyId={storyId}
+          fragment={editingFragment}
+          onClose={() => setEditingId(null)}
+        />
       )}
-    </section>
+    </ScrollArea>
   )
 }
 
-function SummaryRow({
+function SummaryCard({
   storyId,
   fragment,
-  editing,
-  onEdit,
-  onCancelEdit,
+  onOpen,
   archived = false,
 }: {
   storyId: string
   fragment: Fragment
-  editing: boolean
-  onEdit: () => void
-  onCancelEdit: () => void
+  onOpen: () => void
   archived?: boolean
 }) {
   const queryClient = useQueryClient()
-  const [draft, setDraft] = useState(fragment.content)
+  const chapterId = (fragment.meta?.chapterId as string | null | undefined) ?? null
+  const isEra = !!fragment.meta?.isEraSummary
 
-  useEffect(() => {
-    setDraft(fragment.content)
-  }, [fragment.content])
+  const invalidate = () => {
+    queryClient.invalidateQueries({ queryKey: ['fragments', storyId, 'summary'] })
+    queryClient.invalidateQueries({ queryKey: ['fragments-archived', storyId, 'summary'] })
+  }
+
+  const archiveMutation = useMutation({
+    mutationFn: () => api.fragments.archive(storyId, fragment.id),
+    onSuccess: invalidate,
+  })
+
+  const restoreMutation = useMutation({
+    mutationFn: () => api.fragments.restore(storyId, fragment.id),
+    onSuccess: invalidate,
+  })
+
+  return (
+    <div className="group/row rounded-md border border-border/30 bg-muted/10 hover:border-border/50 hover:bg-muted/20 transition-colors">
+      <button
+        type="button"
+        onClick={onOpen}
+        className="w-full text-left p-2.5 flex items-start gap-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40 rounded-md"
+      >
+        <Bookmark className={`size-3 mt-0.5 shrink-0 ${isEra ? 'text-primary/60' : 'text-muted-foreground/60'}`} />
+        <div className="flex-1 min-w-0">
+          <p className="text-[0.8125rem] font-display italic leading-tight text-foreground/90 truncate">{fragment.name}</p>
+          <div className="flex items-center gap-1.5 mt-0.5 text-[0.5625rem] text-muted-foreground uppercase tracking-[0.12em]">
+            {isEra && <span>era</span>}
+            {isEra && <span aria-hidden className="text-muted-foreground/40">·</span>}
+            <span className="tabular-nums normal-case tracking-normal">{fragment.content.length.toLocaleString()} chars</span>
+            {chapterId && (
+              <>
+                <span aria-hidden className="text-muted-foreground/40">·</span>
+                <span className="font-mono normal-case tracking-normal text-muted-foreground/60">{chapterId}</span>
+              </>
+            )}
+          </div>
+          <p className="mt-1.5 text-[0.6875rem] font-prose text-foreground/60 leading-relaxed line-clamp-2">
+            {fragment.content || <span className="italic text-muted-foreground/40">(empty)</span>}
+          </p>
+        </div>
+      </button>
+      <div className="px-2 pb-2 flex items-center justify-end gap-0.5 opacity-0 group-hover/row:opacity-100 focus-within:opacity-100 transition-opacity">
+        {archived ? (
+          <button
+            onClick={(e) => { e.stopPropagation(); restoreMutation.mutate() }}
+            disabled={restoreMutation.isPending}
+            aria-label="Restore summary"
+            className="p-1 rounded text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors"
+          >
+            <ArchiveRestore className="size-3" />
+          </button>
+        ) : (
+          <button
+            onClick={(e) => { e.stopPropagation(); archiveMutation.mutate() }}
+            disabled={archiveMutation.isPending}
+            aria-label="Archive summary"
+            className="p-1 rounded text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors"
+          >
+            <Archive className="size-3" />
+          </button>
+        )}
+      </div>
+    </div>
+  )
+}
+
+// ── Full-view summary editor ─────────────────────────────────
+//
+// Portalled fullscreen overlay. Wide prose-column textarea, generous
+// leading. Auto-saves on blur. Esc closes; body scroll is locked.
+
+function FullscreenSummaryEditor({
+  storyId,
+  fragment,
+  onClose,
+}: {
+  storyId: string
+  fragment: Fragment
+  onClose: () => void
+}) {
+  const queryClient = useQueryClient()
+  const [draft, setDraft] = useState(fragment.content)
+  const savedRef = useRef(fragment.content)
+  const [saveState, setSaveState] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle')
+  const savedFlashTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const chapterId = (fragment.meta?.chapterId as string | null | undefined) ?? null
   const isEra = !!fragment.meta?.isEraSummary
@@ -1115,15 +1208,20 @@ function SummaryRow({
         description: fragment.description,
         content,
       }),
-    onSuccess: () => {
+    onMutate: () => setSaveState('saving'),
+    onSuccess: (_data, content) => {
+      savedRef.current = content
+      setSaveState('saved')
       invalidate()
-      onCancelEdit()
+      if (savedFlashTimerRef.current) clearTimeout(savedFlashTimerRef.current)
+      savedFlashTimerRef.current = setTimeout(() => setSaveState('idle'), 1200)
     },
+    onError: () => setSaveState('error'),
   })
 
   const archiveMutation = useMutation({
     mutationFn: () => api.fragments.archive(storyId, fragment.id),
-    onSuccess: invalidate,
+    onSuccess: () => { invalidate(); onClose() },
   })
 
   const restoreMutation = useMutation({
@@ -1131,83 +1229,140 @@ function SummaryRow({
     onSuccess: invalidate,
   })
 
-  return (
-    <div className="rounded-md border border-border/30 bg-muted/10 p-2 space-y-1.5">
-      <div className="flex items-start gap-2">
-        <Bookmark className={`size-3 mt-0.5 shrink-0 ${isEra ? 'text-primary/60' : 'text-muted-foreground/60'}`} />
-        <div className="flex-1 min-w-0">
-          <p className="text-[0.75rem] font-medium truncate leading-tight">{fragment.name}</p>
-          <div className="flex items-center gap-1.5 mt-0.5 text-[0.5625rem] text-muted-foreground uppercase tracking-[0.1em]">
-            {isEra && <span>era</span>}
-            {isEra && <span aria-hidden className="text-muted-foreground/40">·</span>}
-            <span className="tabular-nums normal-case tracking-normal">{fragment.content.length} chars</span>
+  // Sync if the fragment content updates externally (background refetch).
+  useEffect(() => {
+    if (fragment.content !== savedRef.current) {
+      savedRef.current = fragment.content
+      setDraft(fragment.content)
+    }
+  }, [fragment.content])
+
+  const saveIfDirty = () => {
+    if (draft.trim() === savedRef.current.trim()) return
+    saveMutation.mutate(draft)
+  }
+
+  // Esc closes (capture-phase to beat outer handlers).
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        e.stopPropagation()
+        saveIfDirty()
+        onClose()
+      }
+    }
+    document.addEventListener('keydown', handler, true)
+    return () => document.removeEventListener('keydown', handler, true)
+  }, [draft, onClose]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Lock body scroll.
+  useEffect(() => {
+    const prev = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    return () => { document.body.style.overflow = prev }
+  }, [])
+
+  return createPortal(
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-label={`Summary editor: ${fragment.name}`}
+      className="fixed inset-0 z-50 flex flex-col bg-background animate-onboarding-fade-in"
+    >
+      {/* Header — serif identity, meta row, actions on the right */}
+      <header className="shrink-0 flex items-start justify-between gap-4 px-6 py-3 border-b border-border/40">
+        <div className="min-w-0 flex flex-col gap-0.5">
+          <p className="font-display italic text-xl leading-tight text-foreground truncate">
+            {fragment.name}
+          </p>
+          <div className="flex items-center gap-2 text-[0.625rem] uppercase tracking-[0.15em] text-muted-foreground">
+            <span>{isEra ? 'era summary' : 'chapter summary'}</span>
+            <span aria-hidden className="text-muted-foreground/40">·</span>
+            <span className="normal-case tracking-normal tabular-nums">
+              {draft.length.toLocaleString()} chars
+            </span>
             {chapterId && (
               <>
                 <span aria-hidden className="text-muted-foreground/40">·</span>
-                <span className="font-mono normal-case tracking-normal text-muted-foreground/60">{chapterId}</span>
+                <span className="font-mono normal-case tracking-normal text-muted-foreground/60">
+                  {chapterId}
+                </span>
+              </>
+            )}
+            {fragment.archived && (
+              <>
+                <span aria-hidden className="text-muted-foreground/40">·</span>
+                <span className="text-destructive/70">archived</span>
               </>
             )}
           </div>
         </div>
-        <div className="flex items-center gap-0.5 shrink-0">
-          {archived ? (
+        <div className="shrink-0 flex items-center gap-1">
+          {fragment.archived ? (
             <button
               onClick={() => restoreMutation.mutate()}
               disabled={restoreMutation.isPending}
               aria-label="Restore summary"
-              className="p-1 rounded text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors"
+              className="flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-display italic text-muted-foreground hover:text-foreground hover:bg-muted/30 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
             >
-              <ArchiveRestore className="size-3" />
+              <ArchiveRestore className="size-3.5" aria-hidden />
+              restore
             </button>
           ) : (
             <button
               onClick={() => archiveMutation.mutate()}
               disabled={archiveMutation.isPending}
               aria-label="Archive summary"
-              className="p-1 rounded text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors"
+              className="flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-display italic text-muted-foreground hover:text-foreground hover:bg-muted/30 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
             >
-              <Archive className="size-3" />
+              <Archive className="size-3.5" aria-hidden />
+              archive
             </button>
           )}
+          <button
+            type="button"
+            onClick={() => { saveIfDirty(); onClose() }}
+            aria-label="Close editor"
+            className="p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
+          >
+            <X className="size-4" aria-hidden />
+          </button>
         </div>
-      </div>
+      </header>
 
-      {editing ? (
-        <div className="space-y-1.5">
+      {/* Body — centered reading column, prose font, generous leading */}
+      <div className="flex-1 min-h-0 overflow-auto">
+        <div className="mx-auto max-w-[68ch] px-8 py-10 md:py-14">
           <Textarea
             value={draft}
             onChange={e => setDraft(e.target.value)}
-            className="min-h-[120px] text-[0.75rem] font-prose leading-relaxed resize-y border-border/40"
+            onBlur={saveIfDirty}
+            placeholder="Write a summary the librarian can remember…"
             autoFocus
+            spellCheck
+            className="w-full min-h-[60vh] font-prose text-[1.0625rem] leading-[1.75] bg-transparent border-none shadow-none px-0 py-0 resize-none focus-visible:ring-0 focus-visible:outline-none placeholder:text-muted-foreground/35 placeholder:italic"
           />
-          <div className="flex justify-end gap-1.5">
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-6 text-[0.6875rem]"
-              onClick={() => { setDraft(fragment.content); onCancelEdit() }}
-            >
-              Cancel
-            </Button>
-            <Button
-              size="sm"
-              className="h-6 text-[0.6875rem]"
-              onClick={() => saveMutation.mutate(draft)}
-              disabled={saveMutation.isPending || draft === fragment.content}
-            >
-              {saveMutation.isPending ? 'Saving…' : 'Save'}
-            </Button>
-          </div>
         </div>
-      ) : (
-        <button
-          onClick={onEdit}
-          className="w-full text-left text-[0.6875rem] font-prose text-foreground/70 leading-relaxed whitespace-pre-wrap line-clamp-4 hover:text-foreground/90 transition-colors"
-        >
-          {fragment.content || <span className="italic text-muted-foreground/40">(empty)</span>}
-        </button>
-      )}
-    </div>
+      </div>
+
+      {/* Footer — Esc hint + save status */}
+      <footer className="shrink-0 flex items-center justify-between px-6 py-2 border-t border-border/30 text-[0.6875rem] text-muted-foreground/70">
+        <span className="font-display italic">
+          Press <kbd className="font-mono text-[0.625rem] px-1 py-0.5 rounded bg-muted/50 not-italic">Esc</kbd> to close · edits autosave on blur
+        </span>
+        <span className="font-display italic min-w-[6rem] text-right">
+          {saveState === 'saving' && (
+            <span className="inline-flex items-center gap-1.5">
+              <span aria-hidden className="inline-block size-1 rounded-full bg-primary/50 animate-wisp-breathe" />
+              saving…
+            </span>
+          )}
+          {saveState === 'saved' && <span>saved</span>}
+          {saveState === 'error' && <span className="text-destructive/80">couldn't save</span>}
+        </span>
+      </footer>
+    </div>,
+    document.body,
   )
 }
 
