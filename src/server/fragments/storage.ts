@@ -273,3 +273,70 @@ export async function deleteFragment(
     await syncCompiledStoryFromCurrentChain(dataDir, storyId)
   }
 }
+
+/**
+ * @deprecated TRANSITIONAL. Delete alongside `StoryMeta.summary` once all
+ * live stories have been migrated.
+ *
+ * One-shot migration for the summary-fragments feature. Converts any
+ * non-empty `story.summary` string into a single summary fragment, then
+ * clears the field. Idempotent — running again with no `story.summary`
+ * is a no-op. Existing summary fragments are never overwritten.
+ *
+ * Called at the top of `buildContextState` and `applyDeferredSummaries`
+ * so legacy content surfaces through the new fragment path on first use.
+ */
+export async function migrateStoryToSummaryFragments(
+  dataDir: string,
+  storyId: string,
+): Promise<{ migrated: boolean; fragmentId?: string }> {
+  const story = await getStory(dataDir, storyId)
+  if (!story) return { migrated: false }
+
+  const legacy = typeof story.summary === 'string' ? story.summary.trim() : ''
+  if (!legacy) return { migrated: false }
+
+  const existing = await listFragments(dataDir, storyId, 'summary', { includeArchived: true })
+  if (existing.length > 0) {
+    // Already migrated or summaries exist from the new flow. Clear the
+    // legacy field so it doesn't drift further.
+    await updateStory(dataDir, { ...story, summary: '', updatedAt: new Date().toISOString() })
+    return { migrated: false }
+  }
+
+  const { generateFragmentId } = await import('@/lib/fragment-ids')
+  const now = new Date().toISOString()
+  const fragment: Fragment = {
+    id: generateFragmentId('summary'),
+    type: 'summary',
+    name: 'Story summary',
+    description: 'Rolling summary migrated from the legacy story.summary field.',
+    content: legacy,
+    tags: [],
+    refs: [],
+    sticky: false,
+    placement: 'system',
+    createdAt: now,
+    updatedAt: now,
+    order: 0,
+    meta: {
+      isEraSummary: true,
+      chapterId: null,
+      migratedFromLegacy: true,
+    },
+    archived: false,
+    version: 1,
+    versions: [],
+  }
+
+  await createFragment(dataDir, storyId, fragment)
+  await updateStory(dataDir, { ...story, summary: '', updatedAt: now })
+
+  requestLogger.info('Migrated legacy story.summary to summary fragment', {
+    storyId,
+    fragmentId: fragment.id,
+    length: legacy.length,
+  })
+
+  return { migrated: true, fragmentId: fragment.id }
+}

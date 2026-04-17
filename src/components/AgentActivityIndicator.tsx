@@ -9,7 +9,8 @@ import { BookOpen, MessageSquare, Sparkles, Compass, Wand2, Bot } from 'lucide-r
 
 interface AgentMeta {
   label: string
-  action: string
+  /** Rotating list of verbs the wisp cycles through while active. */
+  actions: string[]
   color: string
   glow: string
   icon: typeof Bot
@@ -18,56 +19,56 @@ interface AgentMeta {
 const AGENT_META: Record<string, AgentMeta> = {
   'librarian.analyze': {
     label: 'Librarian',
-    action: 'Analyzing',
+    actions: ['Reading', 'Annotating', 'Cross-referencing', 'Noting details'],
     color: 'oklch(0.78 0.15 70)',
     glow: 'oklch(0.78 0.15 70 / 35%)',
     icon: BookOpen,
   },
   'librarian.refine': {
     label: 'Librarian',
-    action: 'Refining',
+    actions: ['Refining', 'Polishing', 'Tightening a line', 'Re-phrasing'],
     color: 'oklch(0.72 0.13 50)',
     glow: 'oklch(0.72 0.13 50 / 35%)',
     icon: Wand2,
   },
   'librarian.chat': {
     label: 'Librarian',
-    action: 'Chatting',
+    actions: ['Listening', 'Considering', 'Composing a reply'],
     color: 'oklch(0.70 0.10 80)',
     glow: 'oklch(0.70 0.10 80 / 35%)',
     icon: MessageSquare,
   },
   'librarian.optimize-character': {
     label: 'Librarian',
-    action: 'Optimizing',
+    actions: ['Sharpening', 'Consolidating', 'Clarifying'],
     color: 'oklch(0.75 0.13 60)',
     glow: 'oklch(0.75 0.13 60 / 35%)',
     icon: Sparkles,
   },
   'librarian.prose-transform': {
     label: 'Librarian',
-    action: 'Transforming',
+    actions: ['Transforming', 'Rewriting', 'Re-voicing'],
     color: 'oklch(0.70 0.12 135)',
     glow: 'oklch(0.70 0.12 135 / 35%)',
     icon: Wand2,
   },
   'character-chat.chat': {
     label: 'Character',
-    action: 'Chatting',
+    actions: ['Listening', 'Considering', 'Reaching for words'],
     color: 'oklch(0.68 0.14 175)',
     glow: 'oklch(0.68 0.14 175 / 35%)',
     icon: MessageSquare,
   },
   'directions.suggest': {
     label: 'Directions',
-    action: 'Suggesting',
+    actions: ['Plotting a path', 'Weighing options', 'Peering ahead'],
     color: 'oklch(0.72 0.11 290)',
     glow: 'oklch(0.72 0.11 290 / 35%)',
     icon: Compass,
   },
   'generation': {
     label: 'Writer',
-    action: 'Generating',
+    actions: ['Writing', 'Finding the next line', 'Listening to the page', 'Setting the scene'],
     color: 'oklch(0.74 0.12 25)',
     glow: 'oklch(0.74 0.12 25 / 35%)',
     icon: Sparkles,
@@ -76,7 +77,7 @@ const AGENT_META: Record<string, AgentMeta> = {
 
 const DEFAULT_META: AgentMeta = {
   label: 'Agent',
-  action: 'Working',
+  actions: ['Working'],
   color: 'oklch(0.65 0.08 240)',
   glow: 'oklch(0.65 0.08 240 / 35%)',
   icon: Bot,
@@ -92,9 +93,9 @@ function getAgentMeta(agentName: string): AgentMeta {
   // Derive readable label/action from the agent name (e.g. "librarian.summarize" → "Librarian · Summarize")
   const parts = agentName.split('.')
   const label = titleCase(parts[0])
-  const action = parts[1] ? titleCase(parts[1]) : 'Working'
+  const actions = [parts[1] ? titleCase(parts[1]) : 'Working']
 
-  return { ...DEFAULT_META, label, action }
+  return { ...DEFAULT_META, label, actions }
 }
 
 // ── Wisp state management ───────────────────────────────
@@ -117,7 +118,6 @@ function formatElapsed(startedAt: string): string {
 
 export function AgentActivityIndicator({ storyId }: { storyId: string }) {
   const [wisps, setWisps] = useState<WispState[]>([])
-  const [, setTick] = useState(0) // force re-render for elapsed time
   const prevIdsRef = useRef(new Set<string>())
 
   const { data: activeAgents } = useQuery({
@@ -156,13 +156,6 @@ export function AgentActivityIndicator({ storyId }: { storyId: string }) {
     prevIdsRef.current = currentIds
   }, [activeAgents])
 
-  // Tick elapsed time every second (only when wisps visible)
-  useEffect(() => {
-    if (wisps.length === 0) return
-    const interval = setInterval(() => setTick(t => t + 1), 1000)
-    return () => clearInterval(interval)
-  }, [wisps.length > 0])
-
   const handleAnimationEnd = useCallback((id: string, phase: 'entering' | 'exiting') => {
     setWisps(prev => {
       if (phase === 'entering') {
@@ -178,7 +171,12 @@ export function AgentActivityIndicator({ storyId }: { storyId: string }) {
   if (wisps.length === 0) return null
 
   return (
-    <div className="absolute bottom-4 left-4 z-20 flex flex-col-reverse items-start gap-2.5 pointer-events-auto">
+    <div
+      role="status"
+      aria-live="polite"
+      aria-label="Agent activity"
+      className="absolute z-20 flex flex-col-reverse items-start gap-2.5 pointer-events-auto bottom-[calc(1rem+env(safe-area-inset-bottom))] left-[calc(1rem+env(safe-area-inset-left))]"
+    >
       {wisps.map((wisp, i) => (
         <Wisp
           key={wisp.agent.id}
@@ -189,6 +187,17 @@ export function AgentActivityIndicator({ storyId }: { storyId: string }) {
       ))}
     </div>
   )
+}
+
+// ── Elapsed time (isolated re-render) ───────────────────
+
+function Elapsed({ startedAt }: { startedAt: string }) {
+  const [text, setText] = useState(() => formatElapsed(startedAt))
+  useEffect(() => {
+    const id = setInterval(() => setText(formatElapsed(startedAt)), 1000)
+    return () => clearInterval(id)
+  }, [startedAt])
+  return <span className="text-[0.625rem] text-foreground/50 tabular-nums">{text}</span>
 }
 
 // ── Individual wisp ─────────────────────────────────────
@@ -204,18 +213,39 @@ function Wisp({
 }) {
   const meta = getAgentMeta(wisp.agent.agentName)
   const Icon = meta.icon
-  const elapsed = formatElapsed(wisp.agent.startedAt)
+
+  // Each wisp rotates through its vocabulary at a slightly randomized cadence,
+  // so multiple wisps don't tick in sync — gives each one a life of its own.
+  const [actionIndex, setActionIndex] = useState(() =>
+    Math.floor(Math.random() * meta.actions.length),
+  )
+  useEffect(() => {
+    if (meta.actions.length <= 1) return
+    const interval = 3800 + Math.floor(Math.random() * 1800)
+    const id = setInterval(() => {
+      setActionIndex(i => (i + 1) % meta.actions.length)
+    }, interval)
+    return () => clearInterval(id)
+  }, [meta.actions.length])
+  const currentAction = meta.actions[actionIndex]
 
   const animClass =
     wisp.phase === 'entering' ? 'animate-wisp-enter' :
     wisp.phase === 'exiting' ? 'animate-wisp-exit' :
     ''
 
+  const accessibleName = `${meta.label}, ${currentAction.toLowerCase()}`
+
   return (
     <Tooltip>
       <TooltipTrigger asChild>
-        <div
-          className={`group relative ${animClass}`}
+        {/* Button wrapper enlarges the hit area to 44×44 while keeping the
+            visual orb at 28px, satisfies keyboard/focus, and carries the
+            accessible name for screen readers. */}
+        <button
+          type="button"
+          aria-label={accessibleName}
+          className={`group relative p-2 -m-2 rounded-full transition-transform duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] hover:scale-110 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:ring-offset-2 focus-visible:ring-offset-background motion-reduce:hover:scale-100 ${animClass}`}
           style={{
             animationDelay: wisp.phase === 'entering' ? `${index * 80}ms` : undefined,
           }}
@@ -227,28 +257,33 @@ function Wisp({
         >
           {/* Main orb with animated gradient */}
           <div
-            className="relative size-7 rounded-full flex items-center justify-center cursor-default animate-wisp-breathe animate-wisp-float animate-wisp-gradient"
+            className="relative size-7 rounded-full flex items-center justify-center animate-wisp-breathe animate-wisp-float animate-wisp-gradient transition-[filter] duration-200 group-hover:brightness-110"
             style={{
               '--wisp-color': meta.color,
               '--wisp-glow': meta.glow,
             } as React.CSSProperties}
           >
-            <Icon className="size-3.5 text-white/90" strokeWidth={2.5} />
+            <Icon
+              aria-hidden="true"
+              className="size-3.5 text-white drop-shadow-[0_0_3px_rgb(0_0_0_/_35%)]"
+              strokeWidth={2.5}
+            />
           </div>
-        </div>
+        </button>
       </TooltipTrigger>
       <TooltipContent
         side="right"
         sideOffset={16}
-        className="px-3 py-2 max-w-48"
+        className="px-3 py-2 max-w-56"
       >
-        <div className="flex flex-col gap-0.5">
-          <span className="text-xs font-medium">
-            {meta.label}
-            <span className="text-foreground/50 mx-1">&middot;</span>
-            {meta.action}
+        <div className="flex flex-col gap-1">
+          <span
+            key={currentAction}
+            className="font-display italic text-sm leading-snug animate-onboarding-fade-in"
+          >
+            The {meta.label.toLowerCase()} <span className="text-foreground/40">—</span> {currentAction.toLowerCase()}
           </span>
-          <span className="text-[0.625rem] text-foreground/60 tabular-nums">{elapsed}</span>
+          <Elapsed startedAt={wisp.agent.startedAt} />
         </div>
       </TooltipContent>
     </Tooltip>

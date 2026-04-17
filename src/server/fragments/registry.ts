@@ -8,6 +8,13 @@ export interface FragmentTypeDefinition {
   shortlistFields?: (keyof Fragment)[]
   /** Whether to generate type-specific LLM tools (get/list) for this type. Defaults to true. */
   llmTools?: boolean
+  /**
+   * Whether this type is hidden from the main fragment list by default.
+   * Used for librarian-managed artifacts (summaries) that don't belong
+   * in the writer's everyday fragment view. They still surface in their
+   * own dedicated panels.
+   */
+  hiddenFromList?: boolean
 }
 
 export class FragmentTypeRegistry {
@@ -122,6 +129,16 @@ export class FragmentTypeRegistry {
       stickyByDefault: false,
       contextRenderer: () => '',
       llmTools: false,
+    })
+
+    this.register({
+      type: 'summary',
+      prefix: 'sm',
+      stickyByDefault: false,
+      contextRenderer: (f) => f.content,
+      shortlistFields: ['id', 'name', 'description'],
+      llmTools: false,
+      hiddenFromList: true,
     })
   }
 }

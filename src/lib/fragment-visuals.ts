@@ -157,6 +157,13 @@ const TYPE_PALETTES: Record<string, { bg: string; colors: string[]; shape: Bubbl
     colors: ['oklch(0.72 0.14 85)', 'oklch(0.78 0.12 70)', 'oklch(0.66 0.16 95)', 'oklch(0.80 0.10 75)', 'oklch(0.74 0.13 60)'],
     shape: 'diamond',
   },
+  // Summaries: quiet, parchment-bookmark palette — warm ochre reading like
+  // annotated page edges. Librarian-managed; rarely decorated beyond context.
+  summary: {
+    bg: 'oklch(0.40 0.05 65)',
+    colors: ['oklch(0.70 0.09 70)', 'oklch(0.74 0.08 55)', 'oklch(0.66 0.10 80)', 'oklch(0.72 0.07 50)', 'oklch(0.68 0.09 65)'],
+    shape: 'rounded-rect',
+  },
 }
 
 export function generateBubbles(id: string, type: string): BubbleSet {

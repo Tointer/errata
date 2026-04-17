@@ -10,7 +10,6 @@ import { AgentsPanel } from '@/components/agents/AgentsPanel'
 import { StoryInfoPanel } from './StoryInfoPanel'
 import { SettingsPanel } from './SettingsPanel'
 import { LibrarianPanel } from './LibrarianPanel'
-import { BlockEditorPanel } from '@/components/blocks/BlockEditorPanel'
 import { ArchivePanel } from './ArchivePanel'
 import { TimelineManagerPanel } from './TimelineManagerPanel'
 import { Button } from '@/components/ui/button'
@@ -168,10 +167,6 @@ export function DetailPanel({
 
       {activeSection === 'agents' && (
         <AgentsPanel storyId={storyId} />
-      )}
-
-      {activeSection === 'blocks' && (
-        <BlockEditorPanel storyId={storyId} />
       )}
 
       {activeSection === 'context-order' && (
