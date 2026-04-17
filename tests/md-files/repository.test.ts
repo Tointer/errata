@@ -186,6 +186,46 @@ describe('md-files repository sync', () => {
     }
   })
 
+  it('defaults bare character markdown files to sticky using the fragment type default', async () => {
+    const tmp = await createTempDir()
+
+    try {
+      const story = makeStory('story-bare-character')
+      await createStory(tmp.path, story)
+
+      const characterPath = join(getMarkdownStoryRoot(tmp.path, story.id), 'Characters', 'Mira Vale.md')
+      await writeFile(characterPath, 'A former courier who memorizes whole districts by smell.', 'utf-8')
+
+      const loaded = await loadMarkdownFragmentById(tmp.path, story.id, 'ch-mira-vale')
+      expect(loaded?.type).toBe('character')
+      expect(loaded?.name).toBe('Mira Vale')
+      expect(loaded?.sticky).toBe(true)
+      expect(loaded?.content).toBe('A former courier who memorizes whole districts by smell.')
+    } finally {
+      await tmp.cleanup()
+    }
+  })
+
+  it('defaults bare knowledge markdown files to sticky using the fragment type default', async () => {
+    const tmp = await createTempDir()
+
+    try {
+      const story = makeStory('story-bare-knowledge')
+      await createStory(tmp.path, story)
+
+      const knowledgePath = join(getMarkdownStoryRoot(tmp.path, story.id), 'Lorebook', 'Glass Coast.md')
+      await writeFile(knowledgePath, 'The coast sings at low tide because of the buried shard fields.', 'utf-8')
+
+      const loaded = await loadMarkdownFragmentById(tmp.path, story.id, 'kn-glass-coast')
+      expect(loaded?.type).toBe('knowledge')
+      expect(loaded?.name).toBe('Glass Coast')
+      expect(loaded?.sticky).toBe(true)
+      expect(loaded?.content).toBe('The coast sings at low tide because of the buried shard fields.')
+    } finally {
+      await tmp.cleanup()
+    }
+  })
+
   it('continues loading fragments when fragment-internals.json is malformed', async () => {
     const tmp = await createTempDir()
 
