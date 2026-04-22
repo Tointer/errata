@@ -37,7 +37,11 @@ export function mkdirWithRetries(path: string, options?: Parameters<typeof mkdir
 export function readFileWithRetries(path: string, encoding: BufferEncoding): Promise<string>
 export function readFileWithRetries(path: string): Promise<Buffer>
 export function readFileWithRetries(path: string, encoding?: BufferEncoding): Promise<string | Buffer> {
-  return withFileOpRetries(() => encoding ? readFile(path, encoding) : readFile(path))
+  if (encoding) {
+    return withFileOpRetries(() => readFile(path, encoding))
+  }
+
+  return withFileOpRetries(() => readFile(path))
 }
 
 export function renameWithRetries(oldPath: string, newPath: string): Promise<void> {
