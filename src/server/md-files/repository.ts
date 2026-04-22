@@ -1,4 +1,4 @@
-import { mkdir, readdir, readFile, rename, rm, stat, writeFile } from 'node:fs/promises'
+import { readdir, stat } from 'node:fs/promises'
 import { existsSync } from 'node:fs'
 import { join } from 'node:path'
 import type { Fragment, ProseChain, StoryMeta } from '@/server/fragments/schema'
@@ -29,6 +29,13 @@ import {
 } from './fragment-internals'
 import { serializeStoryMeta, storyMetaFromMarkdown } from './story-meta'
 import { registry } from '../fragments/registry'
+import {
+  mkdirWithRetries,
+  readFileWithRetries,
+  renameWithRetries,
+  rmWithRetries,
+  writeFileWithRetries,
+} from '../fs-utils'
 import { createLogger } from '../logging/logger'
 import { getFrozenSections, type FrozenSection } from '../fragments/protection'
 
@@ -355,28 +362,28 @@ async function findMarkdownFragmentEntry(
 
 export async function ensureMarkdownStoryLayout(dataDir: string, storyId: string): Promise<void> {
   const root = getMarkdownStoryRoot(dataDir, storyId)
-  await mkdir(root, { recursive: true })
+  await mkdirWithRetries(root, { recursive: true })
   await Promise.all([
-    ...STORY_DIRS.map((dirName) => mkdir(join(root, dirName), { recursive: true })),
-    ...INTERNAL_MARKDOWN_DIRS.map((dirName) => mkdir(join(root, dirName), { recursive: true })),
-    mkdir(getInternalStoryRoot(dataDir, storyId), { recursive: true }),
+    ...STORY_DIRS.map((dirName) => mkdirWithRetries(join(root, dirName), { recursive: true })),
+    ...INTERNAL_MARKDOWN_DIRS.map((dirName) => mkdirWithRetries(join(root, dirName), { recursive: true })),
+    mkdirWithRetries(getInternalStoryRoot(dataDir, storyId), { recursive: true }),
   ])
   const compiledPath = getCompiledStoryPath(dataDir, storyId)
   if (!existsSync(compiledPath)) {
-    await writeFile(compiledPath, '', 'utf-8')
+    await writeFileWithRetries(compiledPath, '', 'utf-8')
   }
 }
 
 export async function syncStoryMarkdownMeta(dataDir: string, story: StoryMeta): Promise<void> {
   await ensureMarkdownStoryLayout(dataDir, story.id)
-  await writeFile(getStoryMetaPath(dataDir, story.id), serializeStoryMeta(story), 'utf-8')
+  await writeFileWithRetries(getStoryMetaPath(dataDir, story.id), serializeStoryMeta(story), 'utf-8')
 }
 
 export async function loadMarkdownStoryMeta(dataDir: string, storyId: string): Promise<StoryMeta | null> {
   const path = getStoryMetaPath(dataDir, storyId)
   if (!existsSync(path)) return null
   const [raw, fileStats] = await Promise.all([
-    readFile(path, 'utf-8'),
+    readFileWithRetries(path, 'utf-8'),
     stat(path),
   ])
   const parsed = parseFrontmatter(raw)
@@ -389,7 +396,7 @@ export async function loadMarkdownStoryMeta(dataDir: string, storyId: string): P
 async function readCurrentProseChain(dataDir: string, storyId: string): Promise<ProseChain | null> {
   const chainPath = getInternalStoryPath(dataDir, storyId, 'prose-chain.json')
   if (!existsSync(chainPath)) return null
-  const raw = await readFile(chainPath, 'utf-8')
+  const raw = await readFileWithRetries(chainPath, 'utf-8')
   return JSON.parse(raw) as ProseChain
 }
 
@@ -414,18 +421,18 @@ export async function syncFragmentMarkdown(dataDir: string, storyId: string, fra
 
   for (const path of existingPaths) {
     if (path !== nextPath && existsSync(path)) {
-      await rm(path, { force: true })
+      await rmWithRetries(path, { force: true })
     }
   }
 
-  await writeFile(nextPath, serializeFragment(fragment), 'utf-8')
+  await writeFileWithRetries(nextPath, serializeFragment(fragment), 'utf-8')
 }
 
 export async function deleteFragmentMarkdown(dataDir: string, storyId: string, fragmentId: string): Promise<void> {
   const existingPaths = (await findMarkdownFragmentEntry(dataDir, storyId, fragmentId, { includeArchived: true })).map((entry) => entry.path)
   for (const path of existingPaths) {
     if (existsSync(path)) {
-      await rm(path, { force: true })
+      await rmWithRetries(path, { force: true })
     }
   }
   await removeFragmentInternalRecord(dataDir, storyId, fragmentId)
@@ -437,7 +444,7 @@ export async function loadMarkdownFragmentById(dataDir: string, storyId: string,
   const path = match?.path
   if (!path || !existsSync(path)) return null
 
-  const raw = await readFile(path, 'utf-8')
+  const raw = await readFileWithRetries(path, 'utf-8')
   const parsed = parseFrontmatter(raw)
   const internalIndex = await readFragmentInternalIndex(dataDir, storyId)
   const internalRecord = internalIndex[fragmentId]
@@ -482,7 +489,7 @@ export async function listMarkdownFragments(
     const visibleType = getTypeForVisibleFolder(folder)
     for (const record of entries) {
       const entry = record.entry
-      const raw = await readFile(record.path, 'utf-8')
+      const raw = await readFileWithRetries(record.path, 'utf-8')
       const parsed = parseFrontmatter(raw)
       const proseId = getProseFragmentIdFromFileName(entry)
       const visibleId = visibleType && isVisibleFilenameDerivedType(visibleType)
@@ -530,7 +537,7 @@ export async function writeCompiledStoryMarkdown(
   const compiled = blocks
     .map((block) => `[[[${block.id}]]]\n${block.content.trimEnd()}`)
     .join('\n\n')
-  await writeFile(getCompiledStoryPath(dataDir, storyId), compiled ? `${compiled}\n` : '', 'utf-8')
+  await writeFileWithRetries(getCompiledStoryPath(dataDir, storyId), compiled ? `${compiled}\n` : '', 'utf-8')
 }
 
 export async function syncCompiledStoryFromCurrentChain(dataDir: string, storyId: string): Promise<void> {
@@ -586,7 +593,7 @@ export async function listArchivedMarkdownFragments(
     const entries = await listFolderEntries(folderPath, folder, { includeArchived: true, onlyArchived: true })
     const visibleType = getTypeForVisibleFolder(folder)
     for (const record of entries) {
-      const raw = await readFile(record.path, 'utf-8')
+      const raw = await readFileWithRetries(record.path, 'utf-8')
       const parsed = parseFrontmatter(raw)
       const proseId = getProseFragmentIdFromFileName(record.entry)
       const visibleId = visibleType && isVisibleFilenameDerivedType(visibleType)
@@ -623,8 +630,8 @@ export async function archiveFragmentMarkdown(dataDir: string, storyId: string, 
   if (!match || match.archived) return false
 
   const archiveDir = join(join(getMarkdownStoryRoot(dataDir, storyId), match.folder), ARCHIVE_SUBDIR)
-  await mkdir(archiveDir, { recursive: true })
-  await rename(match.path, join(archiveDir, match.entry))
+  await mkdirWithRetries(archiveDir, { recursive: true })
+  await renameWithRetries(match.path, join(archiveDir, match.entry))
   return true
 }
 
@@ -633,6 +640,6 @@ export async function restoreFragmentMarkdown(dataDir: string, storyId: string, 
   if (!match) return false
 
   const targetDir = join(getMarkdownStoryRoot(dataDir, storyId), match.folder)
-  await rename(match.path, join(targetDir, match.entry))
+  await renameWithRetries(match.path, join(targetDir, match.entry))
   return true
 }

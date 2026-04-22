@@ -1,13 +1,14 @@
-import { mkdir, readdir, readFile, writeFile } from 'node:fs/promises'
+import { readdir } from 'node:fs/promises'
 import { join } from 'node:path'
 import { existsSync } from 'node:fs'
 import type { LogEntry, LogSummary } from './types'
+import { mkdirWithRetries, readFileWithRetries, writeFileWithRetries } from '../fs-utils'
 
 const MAX_LOGS_PER_FILE = 1000
 const MAX_LOG_FILES = 5
 
 function logsDir(dataDir: string): string {
-  return join(dataDir, 'logs')
+  return join(process.env.GLOBAL_DATA_DIR?.trim() || dataDir, 'logs')
 }
 
 function logFilePath(dataDir: string, index: number): string {
@@ -20,7 +21,7 @@ function logFilePath(dataDir: string, index: number): string {
  */
 export async function saveLogEntry(dataDir: string, entry: LogEntry): Promise<void> {
   const dir = logsDir(dataDir)
-  await mkdir(dir, { recursive: true })
+  await mkdirWithRetries(dir, { recursive: true })
 
   // Find the current log file
   let currentIndex = 0
@@ -30,7 +31,7 @@ export async function saveLogEntry(dataDir: string, entry: LogEntry): Promise<vo
       currentIndex = i
       break
     }
-    const stats = await readFile(path, 'utf-8')
+    const stats = await readFileWithRetries(path, 'utf-8')
     const lines = stats.split('\n').filter(line => line.trim())
     if (lines.length < MAX_LOGS_PER_FILE) {
       currentIndex = i
@@ -46,8 +47,8 @@ export async function saveLogEntry(dataDir: string, entry: LogEntry): Promise<vo
       const oldPath = logFilePath(dataDir, i + 1)
       const newPath = logFilePath(dataDir, i)
       if (existsSync(oldPath)) {
-        const content = await readFile(oldPath, 'utf-8')
-        await writeFile(newPath, content, 'utf-8')
+        const content = await readFileWithRetries(oldPath, 'utf-8')
+        await writeFileWithRetries(newPath, content, 'utf-8')
       }
     }
     currentIndex = MAX_LOG_FILES - 1
@@ -57,8 +58,8 @@ export async function saveLogEntry(dataDir: string, entry: LogEntry): Promise<vo
   const line = JSON.stringify(entry) + '\n'
   
   // Append to file
-  const existing = existsSync(path) ? await readFile(path, 'utf-8') : ''
-  await writeFile(path, existing + line, 'utf-8')
+  const existing = existsSync(path) ? await readFileWithRetries(path, 'utf-8') : ''
+  await writeFileWithRetries(path, existing + line, 'utf-8')
 }
 
 /**
@@ -81,7 +82,7 @@ export async function listLogs(
     const path = logFilePath(dataDir, i)
     if (!existsSync(path)) continue
 
-    const content = await readFile(path, 'utf-8')
+    const content = await readFileWithRetries(path, 'utf-8')
     const lines = content.split('\n').filter(line => line.trim())
 
     for (const line of lines) {
@@ -118,7 +119,7 @@ export async function getLogEntry(dataDir: string, logId: string): Promise<LogEn
     const path = logFilePath(dataDir, i)
     if (!existsSync(path)) continue
 
-    const content = await readFile(path, 'utf-8')
+    const content = await readFileWithRetries(path, 'utf-8')
     const lines = content.split('\n').filter(line => line.trim())
 
     for (const line of lines) {
@@ -143,7 +144,7 @@ export async function clearLogs(dataDir: string): Promise<void> {
   const entries = await readdir(dir)
   for (const entry of entries) {
     if (entry.startsWith('app-') && entry.endsWith('.jsonl')) {
-      await writeFile(join(dir, entry), '', 'utf-8')
+      await writeFileWithRetries(join(dir, entry), '', 'utf-8')
     }
   }
 }

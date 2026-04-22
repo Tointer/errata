@@ -1,4 +1,3 @@
-import { mkdir, readFile, rm, writeFile } from 'node:fs/promises'
 import { existsSync } from 'node:fs'
 import type { Fragment } from '@/server/fragments/schema'
 import {
@@ -8,7 +7,7 @@ import {
 } from './paths'
 import { buildProseInternalFields, type ProseFragmentInternalFields } from './prose-metadata'
 import { createLogger } from '../logging/logger'
-import { writeJsonAtomic } from '../fs-utils'
+import { mkdirWithRetries, readFileWithRetries, rmWithRetries, writeJsonAtomic } from '../fs-utils'
 
 const logger = createLogger('fragment-internals')
 const pendingStoryIndexWrites = new Map<string, Promise<void>>()
@@ -87,7 +86,7 @@ async function readLegacyProseFragmentIndex(
   const legacyPath = getLegacyProseFragmentIndexPath(dataDir, storyId)
   if (!existsSync(legacyPath)) return {}
   try {
-    const raw = await readFile(legacyPath, 'utf-8')
+    const raw = await readFileWithRetries(legacyPath, 'utf-8')
     return migrateLegacyProseIndex(JSON.parse(raw) as Record<string, LegacyProseFragmentInternalRecord>)
   } catch (error) {
     logger.warn('Failed to parse legacy prose fragment index; continuing without it', {
@@ -107,7 +106,7 @@ export async function readFragmentInternalIndex(
   let current: Record<string, FragmentInternalRecord> = {}
   if (existsSync(indexPath)) {
     try {
-      current = JSON.parse(await readFile(indexPath, 'utf-8')) as Record<string, FragmentInternalRecord>
+      current = JSON.parse(await readFileWithRetries(indexPath, 'utf-8')) as Record<string, FragmentInternalRecord>
     } catch (error) {
       logger.warn('Failed to parse fragment internal index; continuing with empty index', {
         storyId,
@@ -131,9 +130,9 @@ async function writeFragmentInternalIndex(
   storyId: string,
   index: Record<string, FragmentInternalRecord>,
 ): Promise<void> {
-  await mkdir(getInternalStoryRoot(dataDir, storyId), { recursive: true })
+  await mkdirWithRetries(getInternalStoryRoot(dataDir, storyId), { recursive: true })
   await writeJsonAtomic(getFragmentInternalIndexPath(dataDir, storyId), index)
-  await rm(getLegacyProseFragmentIndexPath(dataDir, storyId), { force: true })
+  await rmWithRetries(getLegacyProseFragmentIndexPath(dataDir, storyId), { force: true })
 }
 
 export function buildFragmentInternalRecord(fragment: Fragment): FragmentInternalRecord {

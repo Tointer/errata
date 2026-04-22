@@ -1,8 +1,8 @@
-import { mkdir, readdir, readFile } from 'node:fs/promises'
+import { readdir } from 'node:fs/promises'
 import { join } from 'node:path'
 import { existsSync } from 'node:fs'
 import { getInternalStoryPath } from '../md-files/paths'
-import { writeJsonAtomic } from '../fs-utils'
+import { mkdirWithRetries, readFileWithRetries, writeJsonAtomic } from '../fs-utils'
 
 export interface ToolCallLog {
   toolName: string
@@ -66,7 +66,7 @@ export async function saveGenerationLog(
   log: GenerationLog,
 ): Promise<void> {
   const dir = await logsDir(dataDir, storyId)
-  await mkdir(dir, { recursive: true })
+  await mkdirWithRetries(dir, { recursive: true })
   await writeJsonAtomic(await logPath(dataDir, storyId, log.id), log)
 }
 
@@ -77,7 +77,7 @@ export async function getGenerationLog(
 ): Promise<GenerationLog | null> {
   const path = await logPath(dataDir, storyId, logId)
   if (!existsSync(path)) return null
-  const raw = await readFile(path, 'utf-8')
+  const raw = await readFileWithRetries(path, 'utf-8')
   return JSON.parse(raw) as GenerationLog
 }
 
@@ -93,7 +93,7 @@ export async function listGenerationLogs(
 
   for (const entry of entries) {
     if (!entry.endsWith('.json')) continue
-    const raw = await readFile(join(dir, entry), 'utf-8')
+    const raw = await readFileWithRetries(join(dir, entry), 'utf-8')
     const log = JSON.parse(raw) as GenerationLog
     summaries.push({
       id: log.id,

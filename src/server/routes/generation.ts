@@ -22,6 +22,7 @@ import {
   type GenerationLog,
   type ToolCallLog,
 } from '../llm/generation-logs'
+import { saveGenerationFailureLog, type GenerationFailureLog } from '../llm/generation-failures'
 import { pluginRegistry } from '../plugins/registry'
 import {
   runBeforeContext,
@@ -411,6 +412,9 @@ export function generationRoutes(dataDir: string) {
 
           // Run save operation after stream completes (skip if aborted with no text)
           if (body.saveResult && !(wasAborted && !fullText.trim())) {
+            let savedFragmentId: string | null = null
+            let generatedTextForRecovery = fullText
+
             try {
               const durationMs = Date.now() - startTime
               requestLogger.info('LLM generation completed', { durationMs, textLength: fullText.length })
@@ -423,10 +427,10 @@ export function generationRoutes(dataDir: string) {
                 fragmentId: (mode === 'regenerate' || mode === 'refine') ? body.fragmentId! : null,
                 toolCalls,
               })
+              generatedTextForRecovery = genResult.text
               requestLogger.info('AfterGeneration hooks completed')
 
               const now = new Date().toISOString()
-              let savedFragmentId: string
 
               if ((mode === 'regenerate' || mode === 'refine') && existingFragment) {
                 // Create a NEW fragment as a variation (don't overwrite)
@@ -568,7 +572,39 @@ export function generationRoutes(dataDir: string) {
               await saveGenerationLog(dataDir, params.storyId, log)
               requestLogger.info('Generation log saved', { logId, stepCount, finishReason, stepsExceeded })
             } catch (err) {
-              requestLogger.error('Error saving generation result', { error: err instanceof Error ? err.message : String(err) })
+              let recoveryLogPath: string | null = null
+
+              try {
+                const recoveryLog: GenerationFailureLog = {
+                  id: `genfail-${Date.now().toString(36)}`,
+                  createdAt: new Date().toISOString(),
+                  storyId: params.storyId,
+                  input: body.input,
+                  generatedText: generatedTextForRecovery,
+                  error: err instanceof Error ? err.message : String(err),
+                  model: resolvedModelId,
+                  durationMs: Date.now() - startTime,
+                  fragmentId: savedFragmentId,
+                  messages: logMessages.map((m) => ({
+                    role: String(m.role),
+                    content: typeof m.content === 'string' ? m.content : JSON.stringify(m.content),
+                  })),
+                  toolCalls,
+                  finishReason: String(lastFinishReason),
+                  stepCount,
+                  ...(fullReasoning ? { reasoning: fullReasoning } : {}),
+                }
+                recoveryLogPath = await saveGenerationFailureLog(dataDir, recoveryLog)
+              } catch (recoveryError) {
+                requestLogger.error('Error saving generation recovery log', {
+                  error: recoveryError instanceof Error ? recoveryError.message : String(recoveryError),
+                })
+              }
+
+              requestLogger.error('Error saving generation result', {
+                error: err instanceof Error ? err.message : String(err),
+                recoveryLogPath,
+              })
             }
             completionResolve?.()
           }
