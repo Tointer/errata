@@ -1,5 +1,3 @@
-import { existsSync } from 'node:fs'
-import { readdir } from 'node:fs/promises'
 import { join } from 'node:path'
 import {
   ARCHIVE_SUBDIR,
@@ -10,6 +8,7 @@ import {
   isVisibleFilenameDerivedType,
   MARKDOWN_FRAGMENT_DIRS,
 } from './paths'
+import { getStorageBackend } from '../storage/runtime'
 
 export interface MarkdownFragmentEntry {
   path: string
@@ -23,10 +22,11 @@ export async function listFolderEntries(
   folder: string,
   opts: { includeArchived?: boolean; onlyArchived?: boolean },
 ): Promise<MarkdownFragmentEntry[]> {
+  const storage = getStorageBackend()
   const matches: MarkdownFragmentEntry[] = []
 
-  if (!opts.onlyArchived && existsSync(folderPath)) {
-    const entries = await readdir(folderPath)
+  if (!opts.onlyArchived && await storage.exists(folderPath)) {
+    const entries = await storage.listDir(folderPath)
     for (const entry of entries) {
       if (!entry.endsWith('.md')) continue
       matches.push({ path: join(folderPath, entry), folder, entry, archived: false })
@@ -35,8 +35,8 @@ export async function listFolderEntries(
 
   if (opts.includeArchived || opts.onlyArchived) {
     const archivePath = join(folderPath, ARCHIVE_SUBDIR)
-    if (existsSync(archivePath)) {
-      const archiveEntries = await readdir(archivePath)
+    if (await storage.exists(archivePath)) {
+      const archiveEntries = await storage.listDir(archivePath)
       for (const entry of archiveEntries) {
         if (!entry.endsWith('.md')) continue
         matches.push({ path: join(archivePath, entry), folder, entry, archived: true })

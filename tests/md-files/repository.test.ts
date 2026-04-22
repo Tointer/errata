@@ -18,7 +18,7 @@ import {
   loadMarkdownFragmentById,
 } from '@/server/md-files'
 import { listStories } from '@/server/fragments/storage'
-import { upsertFragmentInternalRecord } from '@/server/md-files/fragment-internals'
+import { upsertFragmentInternalRecord } from '@/server/storage/fragment-internals'
 
 function makeStory(id: string): StoryMeta {
   const now = new Date().toISOString()

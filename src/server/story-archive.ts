@@ -12,12 +12,7 @@ import {
   getStoryDir,
   getStoryInternalDir,
 } from './storage/paths'
-import {
-  collectDirectoryFiles,
-  ensureArchiveDir,
-  writeArchiveBytes,
-  writeArchiveJson,
-} from './story-archive-files'
+import { getStorageBackend } from './storage/runtime'
 
 export interface ExportResult {
   buffer: Uint8Array
@@ -30,6 +25,7 @@ export async function exportStoryAsZip(
   dataDir: string,
   storyId: string,
 ): Promise<ExportResult> {
+  const storage = getStorageBackend()
   const storyDir = getStoryDir(dataDir, storyId)
   const story = await getStory(dataDir, storyId)
   if (!story) {
@@ -37,7 +33,14 @@ export async function exportStoryAsZip(
   }
 
   const zipRoot = 'errata-story-export'
-  const files = await collectDirectoryFiles(storyDir, zipRoot)
+  const files = Object.fromEntries(
+    await Promise.all(
+      (await storage.listTree(storyDir)).map(async (relativePath) => [
+        `${zipRoot}/${relativePath}`,
+        await storage.readBytes(join(storyDir, relativePath)),
+      ] as const),
+    ),
+  )
 
   // Ensure branches.json reflects migrated state
   const branchesIndex = await getBranchesIndex(dataDir, storyId)
@@ -124,6 +127,7 @@ async function importMarkdownStoryFormat(
   extracted: Record<string, Uint8Array>,
   paths: string[],
 ): Promise<void> {
+  const storage = getStorageBackend()
   const root = await getContentRoot(dataDir, storyId)
   const rootPrefix = getArchiveRootPrefix(paths)
 
@@ -133,7 +137,7 @@ async function importMarkdownStoryFormat(
     const relativePath = rootPrefix ? path.slice(rootPrefix.length) : path
     if (!relativePath || relativePath === 'branches.json' || relativePath === '.errata/_story.md') continue
 
-    await writeArchiveBytes(join(root, relativePath), content)
+    await storage.writeBytes(join(root, relativePath), content, { ensureDir: true })
   }
 }
 
@@ -146,6 +150,7 @@ async function importNewFormat(
   decoder: TextDecoder,
   branchesKey: string,
 ): Promise<void> {
+  const storage = getStorageBackend()
   const storyDir = getStoryDir(dataDir, storyId)
 
   // Read branches.json from archive
@@ -162,7 +167,7 @@ async function importNewFormat(
   }
 
   // Write branches.json (overwrite the default one from createStory)
-  await writeArchiveJson(join(storyDir, 'branches.json'), branchesIndex)
+  await storage.writeJson(join(storyDir, 'branches.json'), branchesIndex, { ensureDir: true })
 
   // Write each branch
   for (const branch of branchesIndex.branches) {
@@ -170,8 +175,8 @@ async function importNewFormat(
     if (!branchPrefix) continue
 
     const bDir = join(storyDir, 'branches', branch.id)
-    await ensureArchiveDir(bDir)
-    await ensureArchiveDir(join(bDir, 'fragments'))
+    await storage.ensureDir(bDir)
+    await storage.ensureDir(join(bDir, 'fragments'))
 
     // Track handled paths so we can copy remaining files verbatim
     const handled = new Set<string>()
@@ -202,6 +207,7 @@ async function importLegacyFormat(
   paths: string[],
   decoder: TextDecoder,
 ): Promise<void> {
+  const storage = getStorageBackend()
   // Collect fragment IDs and build remap
   const idMap = new Map<string, string>()
   const fragmentFiles: Array<{ data: Fragment }> = []
@@ -230,11 +236,12 @@ async function importLegacyFormat(
   const root = await getContentRoot(dataDir, storyId)
   const internalRoot = getStoryInternalDir(dataDir, storyId)
   const fragmentsDir = join(internalRoot, 'fragments')
-  await ensureArchiveDir(fragmentsDir)
+  await storage.ensureDir(fragmentsDir)
   for (const fragment of remappedFragments) {
-    await writeArchiveJson(
+    await storage.writeJson(
       join(fragmentsDir, `${fragment.id}.json`),
       fragment,
+      { ensureDir: true },
     )
   }
 
@@ -265,13 +272,13 @@ async function importLegacyFormat(
     if (path.includes('/branches/')) continue
     handledLegacy.add(path)
     const logsDir = join(internalRoot, 'generation-logs')
-    await ensureArchiveDir(logsDir)
+    await storage.ensureDir(logsDir)
     const filename = path.split('/').pop()!
     const logData = JSON.parse(decoder.decode(content))
     if (logData.fragmentId && idMap.has(logData.fragmentId)) {
       logData.fragmentId = idMap.get(logData.fragmentId)
     }
-    await writeArchiveJson(join(logsDir, filename), logData)
+    await storage.writeJson(join(logsDir, filename), logData, { ensureDir: true })
   }
 
   // Copy all remaining files verbatim (librarian, agent-blocks, block-config, etc.)
@@ -287,7 +294,7 @@ async function importLegacyFormat(
     if (relativePath === 'prose-chain.json' || relativePath === 'associations.json') continue
     if (handledLegacy.has(path)) continue
     const targetPath = join(root, normalizeLegacyStoryRelativePath(relativePath))
-    await writeArchiveBytes(targetPath, content)
+    await storage.writeBytes(targetPath, content, { ensureDir: true })
   }
 }
 
@@ -363,6 +370,7 @@ async function writeBranchFragments(
   idMap: Map<string, string>,
   handled: Set<string>,
 ): Promise<void> {
+  const storage = getStorageBackend()
   const fragPrefix = branchPrefix + '/fragments/'
   for (const [path, content] of Object.entries(extracted)) {
     if (!path.startsWith(fragPrefix) || !path.endsWith('.json')) continue
@@ -375,9 +383,10 @@ async function writeBranchFragments(
       refs: fragment.refs.map((ref) => idMap.get(ref) ?? ref),
       meta: remapMeta(fragment.meta, idMap),
     }
-    await writeArchiveJson(
+    await storage.writeJson(
       join(bDir, 'fragments', `${newId}.json`),
       remapped,
+      { ensureDir: true },
     )
   }
 }
@@ -390,6 +399,7 @@ async function writeBranchProseChain(
   idMap: Map<string, string>,
   handled: Set<string>,
 ): Promise<void> {
+  const storage = getStorageBackend()
   const key = `${branchPrefix}/prose-chain.json`
   if (!extracted[key]) return
   handled.add(key)
@@ -400,7 +410,7 @@ async function writeBranchProseChain(
       active: idMap.get(entry.active) ?? entry.active,
     })),
   }
-  await writeArchiveJson(join(bDir, 'prose-chain.json'), remapped)
+  await storage.writeJson(join(bDir, 'prose-chain.json'), remapped, { ensureDir: true })
 }
 
 async function writeBranchAssociations(
@@ -411,12 +421,13 @@ async function writeBranchAssociations(
   idMap: Map<string, string>,
   handled: Set<string>,
 ): Promise<void> {
+  const storage = getStorageBackend()
   const key = `${branchPrefix}/associations.json`
   if (!extracted[key]) return
   handled.add(key)
   const assoc = JSON.parse(decoder.decode(extracted[key])) as Associations
   const remapped = remapAssociations(assoc, idMap)
-  await writeArchiveJson(join(bDir, 'associations.json'), remapped)
+  await storage.writeJson(join(bDir, 'associations.json'), remapped, { ensureDir: true })
 }
 
 async function writeBranchGenerationLogs(
@@ -427,6 +438,7 @@ async function writeBranchGenerationLogs(
   idMap: Map<string, string>,
   handled: Set<string>,
 ): Promise<void> {
+  const storage = getStorageBackend()
   const prefix = `${branchPrefix}/generation-logs/`
   for (const [path, content] of Object.entries(extracted)) {
     if (!path.startsWith(prefix) || !path.endsWith('.json')) continue
@@ -436,9 +448,9 @@ async function writeBranchGenerationLogs(
       logData.fragmentId = idMap.get(logData.fragmentId)
     }
     const logsDir = join(bDir, 'generation-logs')
-    await ensureArchiveDir(logsDir)
+    await storage.ensureDir(logsDir)
     const filename = path.split('/').pop()!
-    await writeArchiveJson(join(logsDir, filename), logData)
+    await storage.writeJson(join(logsDir, filename), logData, { ensureDir: true })
   }
 }
 
@@ -449,12 +461,13 @@ async function copyRemainingBranchFiles(
   bDir: string,
   handled: Set<string>,
 ): Promise<void> {
+  const storage = getStorageBackend()
   const prefix = branchPrefix + '/'
   for (const [path, content] of Object.entries(extracted)) {
     if (!path.startsWith(prefix) || handled.has(path)) continue
     const relativePath = path.slice(prefix.length)
     const targetPath = join(bDir, relativePath)
-    await writeArchiveBytes(targetPath, content)
+    await storage.writeBytes(targetPath, content, { ensureDir: true })
   }
 }
 

@@ -1,13 +1,12 @@
-import { existsSync } from 'node:fs'
 import type { Fragment } from '@/server/fragments/schema'
 import {
   getFragmentInternalIndexPath,
   getInternalStoryRoot,
   getLegacyProseFragmentIndexPath,
-} from './paths'
-import { buildProseInternalFields, type ProseFragmentInternalFields } from './prose-metadata'
+} from '../md-files/paths'
+import { buildProseInternalFields, type ProseFragmentInternalFields } from '../md-files/prose-metadata'
 import { createLogger } from '../logging/logger'
-import { mkdirWithRetries, readFileWithRetries, rmWithRetries, writeJsonAtomic } from '../fs-utils'
+import { getStorageBackend } from './runtime'
 
 const logger = createLogger('fragment-internals')
 const pendingStoryIndexWrites = new Map<string, Promise<void>>()
@@ -83,10 +82,12 @@ async function readLegacyProseFragmentIndex(
   dataDir: string,
   storyId: string,
 ): Promise<Record<string, FragmentInternalRecord>> {
+  const storage = getStorageBackend()
   const legacyPath = getLegacyProseFragmentIndexPath(dataDir, storyId)
-  if (!existsSync(legacyPath)) return {}
+  if (!(await storage.exists(legacyPath))) return {}
+
   try {
-    const raw = await readFileWithRetries(legacyPath, 'utf-8')
+    const raw = await storage.readText(legacyPath)
     return migrateLegacyProseIndex(JSON.parse(raw) as Record<string, LegacyProseFragmentInternalRecord>)
   } catch (error) {
     logger.warn('Failed to parse legacy prose fragment index; continuing without it', {
@@ -102,11 +103,13 @@ export async function readFragmentInternalIndex(
   dataDir: string,
   storyId: string,
 ): Promise<Record<string, FragmentInternalRecord>> {
+  const storage = getStorageBackend()
   const indexPath = getFragmentInternalIndexPath(dataDir, storyId)
   let current: Record<string, FragmentInternalRecord> = {}
-  if (existsSync(indexPath)) {
+
+  if (await storage.exists(indexPath)) {
     try {
-      current = JSON.parse(await readFileWithRetries(indexPath, 'utf-8')) as Record<string, FragmentInternalRecord>
+      current = await storage.readJson<Record<string, FragmentInternalRecord>>(indexPath)
     } catch (error) {
       logger.warn('Failed to parse fragment internal index; continuing with empty index', {
         storyId,
@@ -115,8 +118,8 @@ export async function readFragmentInternalIndex(
       })
     }
   }
-  const legacy = await readLegacyProseFragmentIndex(dataDir, storyId)
 
+  const legacy = await readLegacyProseFragmentIndex(dataDir, storyId)
   if (Object.keys(legacy).length === 0) return current
 
   return {
@@ -130,9 +133,14 @@ async function writeFragmentInternalIndex(
   storyId: string,
   index: Record<string, FragmentInternalRecord>,
 ): Promise<void> {
-  await mkdirWithRetries(getInternalStoryRoot(dataDir, storyId), { recursive: true })
-  await writeJsonAtomic(getFragmentInternalIndexPath(dataDir, storyId), index)
-  await rmWithRetries(getLegacyProseFragmentIndexPath(dataDir, storyId), { force: true })
+  const storage = getStorageBackend()
+  await storage.ensureDir(getInternalStoryRoot(dataDir, storyId))
+  await storage.writeJson(getFragmentInternalIndexPath(dataDir, storyId), index)
+
+  const legacyPath = getLegacyProseFragmentIndexPath(dataDir, storyId)
+  if (await storage.exists(legacyPath)) {
+    await storage.delete(legacyPath)
+  }
 }
 
 export function buildFragmentInternalRecord(fragment: Fragment): FragmentInternalRecord {

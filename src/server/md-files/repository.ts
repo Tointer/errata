@@ -1,7 +1,6 @@
-import { stat } from 'node:fs/promises'
-import { existsSync } from 'node:fs'
 import { join } from 'node:path'
 import type { Fragment, ProseChain, StoryMeta } from '@/server/fragments/schema'
+import { getProseChain } from '../fragments/prose-chain'
 import {
   getFilenameDerivedFragmentId,
   getCompiledStoryPath,
@@ -37,55 +36,52 @@ import {
   removeFragmentInternalRecord,
   resolveFragmentTimestamps,
   upsertFragmentInternalRecord,
-} from './fragment-internals'
+} from '../storage/fragment-internals'
 import { serializeStoryMeta, storyMetaFromMarkdown } from './story-meta'
-import {
-  mkdirWithRetries,
-  readFileWithRetries,
-  writeFileWithRetries,
-} from '../fs-utils'
 import { createLogger } from '../logging/logger'
+import { getStorageBackend } from '../storage/runtime'
 
 const repositoryLogger = createLogger('md-repository')
 
 export async function ensureMarkdownStoryLayout(dataDir: string, storyId: string): Promise<void> {
+  const storage = getStorageBackend()
   const root = getMarkdownStoryRoot(dataDir, storyId)
-  await mkdirWithRetries(root, { recursive: true })
+  await storage.ensureDir(root)
   await Promise.all([
-    ...STORY_DIRS.map((dirName) => mkdirWithRetries(join(root, dirName), { recursive: true })),
-    ...INTERNAL_MARKDOWN_DIRS.map((dirName) => mkdirWithRetries(join(root, dirName), { recursive: true })),
-    mkdirWithRetries(getInternalStoryRoot(dataDir, storyId), { recursive: true }),
+    ...STORY_DIRS.map((dirName) => storage.ensureDir(join(root, dirName))),
+    ...INTERNAL_MARKDOWN_DIRS.map((dirName) => storage.ensureDir(join(root, dirName))),
+    storage.ensureDir(getInternalStoryRoot(dataDir, storyId)),
   ])
   const compiledPath = getCompiledStoryPath(dataDir, storyId)
-  if (!existsSync(compiledPath)) {
-    await writeFileWithRetries(compiledPath, '', 'utf-8')
+  if (!(await storage.exists(compiledPath))) {
+    await storage.writeText(compiledPath, '')
   }
 }
 
 export async function syncStoryMarkdownMeta(dataDir: string, story: StoryMeta): Promise<void> {
+  const storage = getStorageBackend()
   await ensureMarkdownStoryLayout(dataDir, story.id)
-  await writeFileWithRetries(getStoryMetaPath(dataDir, story.id), serializeStoryMeta(story), 'utf-8')
+  await storage.writeText(getStoryMetaPath(dataDir, story.id), serializeStoryMeta(story), { ensureDir: true })
 }
 
 export async function loadMarkdownStoryMeta(dataDir: string, storyId: string): Promise<StoryMeta | null> {
+  const storage = getStorageBackend()
   const path = getStoryMetaPath(dataDir, storyId)
-  if (!existsSync(path)) return null
+  if (!(await storage.exists(path))) return null
   const [raw, fileStats] = await Promise.all([
-    readFileWithRetries(path, 'utf-8'),
-    stat(path),
+    storage.readText(path),
+    storage.getMetadata(path),
   ])
   const parsed = parseFrontmatter(raw)
   return storyMetaFromMarkdown(parsed.attributes, parsed.body, {
-    createdAt: fileStats.birthtime.toISOString(),
-    updatedAt: fileStats.mtime.toISOString(),
+    createdAt: fileStats?.createdAt,
+    updatedAt: fileStats?.updatedAt,
   })
 }
 
 async function readCurrentProseChain(dataDir: string, storyId: string): Promise<ProseChain | null> {
-  const chainPath = getInternalStoryPath(dataDir, storyId, 'prose-chain.json')
-  if (!existsSync(chainPath)) return null
-  const raw = await readFileWithRetries(chainPath, 'utf-8')
-  return JSON.parse(raw) as ProseChain
+  void getInternalStoryPath
+  return getProseChain(dataDir, storyId)
 }
 
 function findProseSectionIndex(chain: ProseChain | null, fragmentId: string): number | undefined {
@@ -117,12 +113,13 @@ export async function deleteFragmentMarkdown(dataDir: string, storyId: string, f
 }
 
 export async function loadMarkdownFragmentById(dataDir: string, storyId: string, fragmentId: string): Promise<Fragment | null> {
+  const storage = getStorageBackend()
   const matches = await findMarkdownFragmentEntry(dataDir, storyId, fragmentId, { includeArchived: true })
   const match = matches[0]
   const path = match?.path
-  if (!path || !existsSync(path)) return null
+  if (!path || !(await storage.exists(path))) return null
 
-  const raw = await readFileWithRetries(path, 'utf-8')
+  const raw = await storage.readText(path)
   const parsed = parseFrontmatter(raw)
   const internalIndex = await readFragmentInternalIndex(dataDir, storyId)
   const internalRecord = internalIndex[fragmentId]
@@ -152,8 +149,9 @@ export async function listMarkdownFragments(
   storyId: string,
   type?: string,
 ): Promise<Fragment[]> {
+  const storage = getStorageBackend()
   const root = getMarkdownStoryRoot(dataDir, storyId)
-  if (!existsSync(root)) return []
+  if (!(await storage.exists(root))) return []
 
   const folders = type ? [getFragmentFolder(type)] : [...MARKDOWN_FRAGMENT_DIRS]
   const fragments: Fragment[] = []
@@ -162,12 +160,12 @@ export async function listMarkdownFragments(
 
   for (const folder of folders) {
     const folderPath = join(root, folder)
-    if (!existsSync(folderPath)) continue
+    if (!(await storage.exists(folderPath))) continue
     const entries = await listFolderEntries(folderPath, folder, { includeArchived: false })
     const visibleType = getTypeForVisibleFolder(folder)
     for (const record of entries) {
       const entry = record.entry
-      const raw = await readFileWithRetries(record.path, 'utf-8')
+      const raw = await storage.readText(record.path)
       const parsed = parseFrontmatter(raw)
       const proseId = getProseFragmentIdFromFileName(entry)
       const visibleId = visibleType && isVisibleFilenameDerivedType(visibleType)
@@ -211,11 +209,12 @@ export async function writeCompiledStoryMarkdown(
   storyId: string,
   blocks: Array<{ id: string; content: string }>,
 ): Promise<void> {
+  const storage = getStorageBackend()
   await ensureMarkdownStoryLayout(dataDir, storyId)
   const compiled = blocks
     .map((block) => `[[[${block.id}]]]\n${block.content.trimEnd()}`)
     .join('\n\n')
-  await writeFileWithRetries(getCompiledStoryPath(dataDir, storyId), compiled ? `${compiled}\n` : '', 'utf-8')
+  await storage.writeText(getCompiledStoryPath(dataDir, storyId), compiled ? `${compiled}\n` : '', { ensureDir: true })
 }
 
 export async function syncCompiledStoryFromCurrentChain(dataDir: string, storyId: string): Promise<void> {
@@ -258,8 +257,9 @@ export async function listArchivedMarkdownFragments(
   storyId: string,
   type?: string,
 ): Promise<Fragment[]> {
+  const storage = getStorageBackend()
   const root = getMarkdownStoryRoot(dataDir, storyId)
-  if (!existsSync(root)) return []
+  if (!(await storage.exists(root))) return []
 
   const folders = type ? [getFragmentFolder(type)] : [...MARKDOWN_FRAGMENT_DIRS]
   const fragments: Fragment[] = []
@@ -267,11 +267,11 @@ export async function listArchivedMarkdownFragments(
 
   for (const folder of folders) {
     const folderPath = join(root, folder)
-    if (!existsSync(folderPath)) continue
+    if (!(await storage.exists(folderPath))) continue
     const entries = await listFolderEntries(folderPath, folder, { includeArchived: true, onlyArchived: true })
     const visibleType = getTypeForVisibleFolder(folder)
     for (const record of entries) {
-      const raw = await readFileWithRetries(record.path, 'utf-8')
+      const raw = await storage.readText(record.path)
       const parsed = parseFrontmatter(raw)
       const proseId = getProseFragmentIdFromFileName(record.entry)
       const visibleId = visibleType && isVisibleFilenameDerivedType(visibleType)
