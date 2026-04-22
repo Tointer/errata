@@ -26,7 +26,7 @@ import {
 } from './markdown-fragment-files.ts'
 import { parseFrontmatter } from './frontmatter'
 import {
-  fragmentFromLegacyMarkdown,
+  fragmentFromExplicitMarkdown,
   serializeFragment,
   visibleFragmentFromMarkdown,
 } from './markdown-fragment-codec'
@@ -127,7 +127,7 @@ export async function loadMarkdownFragmentById(dataDir: string, storyId: string,
       parsed.body,
       internalRecord?.prose,
       resolveFragmentTimestamps(parsed.attributes, internalRecord),
-      (attributes, body) => fragmentFromLegacyMarkdown(attributes, body, internalRecord),
+      (attributes, body) => fragmentFromExplicitMarkdown(attributes, body, internalRecord),
     )
   }
 
@@ -136,7 +136,7 @@ export async function loadMarkdownFragmentById(dataDir: string, storyId: string,
     return visibleFragmentFromMarkdown(visibleType, match.entry, parsed.attributes, parsed.body, internalRecord)
   }
 
-  return fragmentFromLegacyMarkdown(parsed.attributes, parsed.body, internalRecord)
+  return fragmentFromExplicitMarkdown(parsed.attributes, parsed.body, internalRecord)
 }
 
 export async function listMarkdownFragments(
@@ -166,7 +166,7 @@ export async function listMarkdownFragments(
       const visibleId = visibleType && isVisibleFilenameDerivedType(visibleType)
         ? getFilenameDerivedFragmentId(visibleType, entry)
         : undefined
-      const legacyId = typeof parsed.attributes.id === 'string' ? parsed.attributes.id : undefined
+      const explicitId = typeof parsed.attributes.id === 'string' ? parsed.attributes.id : undefined
       const fragment = folder === 'Prose'
         ? proseFragmentFromMarkdown(
             proseId,
@@ -174,11 +174,11 @@ export async function listMarkdownFragments(
             parsed.body,
             internalIndex[proseId]?.prose,
             resolveFragmentTimestamps(parsed.attributes, internalIndex[proseId]),
-            (attributes, body) => fragmentFromLegacyMarkdown(attributes, body, internalIndex[proseId]),
+            (attributes, body) => fragmentFromExplicitMarkdown(attributes, body, internalIndex[proseId]),
           )
         : visibleType && isVisibleFilenameDerivedType(visibleType)
           ? visibleFragmentFromMarkdown(visibleType, entry, parsed.attributes, parsed.body, internalIndex[visibleId ?? ''])
-          : fragmentFromLegacyMarkdown(parsed.attributes, parsed.body, legacyId ? internalIndex[legacyId] : undefined)
+          : fragmentFromExplicitMarkdown(parsed.attributes, parsed.body, explicitId ? internalIndex[explicitId] : undefined)
 
       if (!fragment) {
         storyLogger.warn('Skipped invalid markdown fragment', {
@@ -272,7 +272,7 @@ export async function listArchivedMarkdownFragments(
       const visibleId = visibleType && isVisibleFilenameDerivedType(visibleType)
         ? getFilenameDerivedFragmentId(visibleType, record.entry)
         : undefined
-      const legacyId = typeof parsed.attributes.id === 'string' ? parsed.attributes.id : undefined
+      const explicitId = typeof parsed.attributes.id === 'string' ? parsed.attributes.id : undefined
       const fragment = folder === 'Prose'
         ? proseFragmentFromMarkdown(
             proseId,
@@ -280,11 +280,11 @@ export async function listArchivedMarkdownFragments(
             parsed.body,
             internalIndex[proseId]?.prose,
             resolveFragmentTimestamps(parsed.attributes, internalIndex[proseId]),
-            (attributes, body) => fragmentFromLegacyMarkdown(attributes, body, internalIndex[proseId]),
+            (attributes, body) => fragmentFromExplicitMarkdown(attributes, body, internalIndex[proseId]),
           )
         : visibleType && isVisibleFilenameDerivedType(visibleType)
           ? visibleFragmentFromMarkdown(visibleType, record.entry, parsed.attributes, parsed.body, internalIndex[visibleId ?? ''])
-          : fragmentFromLegacyMarkdown(parsed.attributes, parsed.body, legacyId ? internalIndex[legacyId] : undefined)
+          : fragmentFromExplicitMarkdown(parsed.attributes, parsed.body, explicitId ? internalIndex[explicitId] : undefined)
 
       if (!fragment) continue
       if (type && fragment.type !== type) continue

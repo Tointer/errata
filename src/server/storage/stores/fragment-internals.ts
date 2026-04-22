@@ -1,9 +1,5 @@
 import type { Fragment } from '@/server/fragments/schema'
-import {
-  getFragmentInternalIndexPath,
-  getInternalStoryRoot,
-  getLegacyProseFragmentIndexPath,
-} from '../../md-files/paths'
+import { getFragmentInternalIndexPath } from '../../md-files/paths'
 import { buildProseInternalFields, type ProseFragmentInternalFields } from '../../md-files/prose-metadata'
 import { createLogger } from '../../logging/logger'
 import { getStorageBackend } from '../runtime'
@@ -20,57 +16,6 @@ export interface FragmentInternalRecord {
   createdAt: string
   updatedAt: string
   prose?: ProseFragmentInternalFields
-}
-
-interface LegacyProseFragmentInternalRecord extends ProseFragmentInternalFields {
-  id: string
-  createdAt: string
-  updatedAt: string
-}
-
-function migrateLegacyProseIndex(
-  legacy: Record<string, LegacyProseFragmentInternalRecord>,
-): Record<string, FragmentInternalRecord> {
-  return Object.fromEntries(
-    Object.entries(legacy).map(([fragmentId, record]) => [
-      fragmentId,
-      {
-        createdAt: record.createdAt,
-        updatedAt: record.updatedAt,
-        prose: {
-          name: record.name,
-          description: record.description,
-          tags: record.tags,
-          refs: record.refs,
-          sticky: record.sticky,
-          placement: record.placement,
-          order: record.order,
-          meta: record.meta,
-        },
-      },
-    ]),
-  )
-}
-
-async function readLegacyProseFragmentIndex(
-  dataDir: string,
-  storyId: string,
-): Promise<Record<string, FragmentInternalRecord>> {
-  const storage = getStorageBackend()
-  const legacyPath = getLegacyProseFragmentIndexPath(dataDir, storyId)
-  const raw = await storage.readTextIfExists(legacyPath)
-  if (!raw) return {}
-
-  try {
-    return migrateLegacyProseIndex(JSON.parse(raw) as Record<string, LegacyProseFragmentInternalRecord>)
-  } catch (error) {
-    logger.warn('Failed to parse legacy prose fragment index; continuing without it', {
-      storyId,
-      path: legacyPath,
-      error: error instanceof Error ? error.message : String(error),
-    })
-    return {}
-  }
 }
 
 export async function readFragmentInternalIndex(
@@ -91,13 +36,7 @@ export async function readFragmentInternalIndex(
     })
   }
 
-  const legacy = await readLegacyProseFragmentIndex(dataDir, storyId)
-  if (Object.keys(legacy).length === 0) return current
-
-  return {
-    ...legacy,
-    ...current,
-  }
+  return current
 }
 
 async function writeFragmentInternalIndex(
@@ -107,11 +46,6 @@ async function writeFragmentInternalIndex(
 ): Promise<void> {
   const storage = getStorageBackend()
   await storage.writeJson(getFragmentInternalIndexPath(dataDir, storyId), index)
-
-  const legacyPath = getLegacyProseFragmentIndexPath(dataDir, storyId)
-  if (await storage.exists(legacyPath)) {
-    await storage.delete(legacyPath)
-  }
 }
 
 export function buildFragmentInternalRecord(fragment: Fragment): FragmentInternalRecord {

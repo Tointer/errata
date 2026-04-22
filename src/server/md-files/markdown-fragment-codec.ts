@@ -195,7 +195,7 @@ export function serializeFragment(fragment: Fragment): string {
   )
 }
 
-export function fragmentFromLegacyMarkdown(
+export function fragmentFromExplicitMarkdown(
   attributes: Record<string, unknown>,
   body: string,
   internalRecord?: FragmentInternalRecord,

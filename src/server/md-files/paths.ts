@@ -6,7 +6,6 @@ export const STORY_META_FILE = '_story.md'
 export const STORY_OUTPUT_FILE = 'story.md'
 export const INTERNAL_DIR = '.errata'
 export const FRAGMENT_INTERNAL_INDEX_FILE = 'fragment-internals.json'
-export const LEGACY_PROSE_FRAGMENT_INDEX_FILE = 'prose-fragments.json'
 export const ARCHIVE_SUBDIR = 'Archive'
 
 const VISIBLE_FOLDER_BY_TYPE: Record<string, string> = {
@@ -68,10 +67,6 @@ export function getInternalStoryPath(dataDir: string, storyId: string, ...segmen
 
 export function getFragmentInternalIndexPath(dataDir: string, storyId: string): string {
   return join(getInternalStoryRoot(dataDir, storyId), FRAGMENT_INTERNAL_INDEX_FILE)
-}
-
-export function getLegacyProseFragmentIndexPath(dataDir: string, storyId: string): string {
-  return join(getInternalStoryRoot(dataDir, storyId), LEGACY_PROSE_FRAGMENT_INDEX_FILE)
 }
 
 export function getFragmentFolder(type: string): string {
