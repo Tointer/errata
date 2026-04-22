@@ -36,7 +36,7 @@ import {
   removeFragmentInternalRecord,
   resolveFragmentTimestamps,
   upsertFragmentInternalRecord,
-} from '../storage/fragment-internals'
+} from '../storage/stores/fragment-internals'
 import { serializeStoryMeta, storyMetaFromMarkdown } from './story-meta'
 import { createLogger } from '../logging/logger'
 import { getStorageBackend } from '../storage/runtime'
@@ -61,22 +61,16 @@ export async function ensureMarkdownStoryLayout(dataDir: string, storyId: string
 export async function syncStoryMarkdownMeta(dataDir: string, story: StoryMeta): Promise<void> {
   const storage = getStorageBackend()
   await ensureMarkdownStoryLayout(dataDir, story.id)
-  await storage.writeText(getStoryMetaPath(dataDir, story.id), serializeStoryMeta(story), { ensureDir: true })
+  await storage.writeText(getStoryMetaPath(dataDir, story.id), serializeStoryMeta(story))
 }
 
 export async function loadMarkdownStoryMeta(dataDir: string, storyId: string): Promise<StoryMeta | null> {
   const storage = getStorageBackend()
   const path = getStoryMetaPath(dataDir, storyId)
-  if (!(await storage.exists(path))) return null
-  const [raw, fileStats] = await Promise.all([
-    storage.readText(path),
-    storage.getMetadata(path),
-  ])
+  const raw = await storage.readTextIfExists(path)
+  if (!raw) return null
   const parsed = parseFrontmatter(raw)
-  return storyMetaFromMarkdown(parsed.attributes, parsed.body, {
-    createdAt: fileStats?.createdAt,
-    updatedAt: fileStats?.updatedAt,
-  })
+  return storyMetaFromMarkdown(parsed.attributes, parsed.body)
 }
 
 async function readCurrentProseChain(dataDir: string, storyId: string): Promise<ProseChain | null> {
@@ -117,9 +111,10 @@ export async function loadMarkdownFragmentById(dataDir: string, storyId: string,
   const matches = await findMarkdownFragmentEntry(dataDir, storyId, fragmentId, { includeArchived: true })
   const match = matches[0]
   const path = match?.path
-  if (!path || !(await storage.exists(path))) return null
+  if (!path) return null
 
-  const raw = await storage.readText(path)
+  const raw = await storage.readTextIfExists(path)
+  if (!raw) return null
   const parsed = parseFrontmatter(raw)
   const internalIndex = await readFragmentInternalIndex(dataDir, storyId)
   const internalRecord = internalIndex[fragmentId]
@@ -214,7 +209,7 @@ export async function writeCompiledStoryMarkdown(
   const compiled = blocks
     .map((block) => `[[[${block.id}]]]\n${block.content.trimEnd()}`)
     .join('\n\n')
-  await storage.writeText(getCompiledStoryPath(dataDir, storyId), compiled ? `${compiled}\n` : '', { ensureDir: true })
+  await storage.writeText(getCompiledStoryPath(dataDir, storyId), compiled ? `${compiled}\n` : '')
 }
 
 export async function syncCompiledStoryFromCurrentChain(dataDir: string, storyId: string): Promise<void> {

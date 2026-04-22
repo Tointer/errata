@@ -64,8 +64,6 @@ export async function saveGenerationLog(
   log: GenerationLog,
 ): Promise<void> {
   const storage = getStorageBackend()
-  const dir = await logsDir(dataDir, storyId)
-  await storage.ensureDir(dir)
   await storage.writeJson(await logPath(dataDir, storyId, log.id), log)
 }
 
@@ -76,8 +74,7 @@ export async function getGenerationLog(
 ): Promise<GenerationLog | null> {
   const storage = getStorageBackend()
   const path = await logPath(dataDir, storyId, logId)
-  if (!(await storage.exists(path))) return null
-  return storage.readJson(path)
+  return storage.readJsonIfExists(path)
 }
 
 export async function listGenerationLogs(

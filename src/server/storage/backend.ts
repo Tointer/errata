@@ -1,7 +1,3 @@
-export interface WriteOptions {
-  ensureDir?: boolean
-}
-
 export interface DeleteOptions {
   recursive?: boolean
 }
@@ -12,18 +8,24 @@ export interface FileMetadata {
   isDirectory: boolean
 }
 
+export interface DirectoryEntry extends FileMetadata {
+  name: string
+}
+
 export interface StorageBackend {
   delete(path: string, options?: DeleteOptions): Promise<void>
   exists(path: string): Promise<boolean>
-  getMetadata(path: string): Promise<FileMetadata | null>
   ensureDir(path: string): Promise<void>
   listDir(path: string): Promise<string[]>
-  listTree(path: string): Promise<string[]>
-  move(fromPath: string, toPath: string, options?: WriteOptions): Promise<void>
+  listDirDetailed(path: string): Promise<DirectoryEntry[]>
+  readTree(path: string): Promise<Record<string, Uint8Array>>
+  move(fromPath: string, toPath: string): Promise<void>
   readBytes(path: string): Promise<Uint8Array>
   readJson<T>(path: string): Promise<T>
+  readJsonIfExists<T>(path: string): Promise<T | null>
   readText(path: string): Promise<string>
-  writeBytes(path: string, content: Uint8Array, options?: WriteOptions): Promise<void>
-  writeJson(path: string, value: unknown, options?: WriteOptions): Promise<void>
-  writeText(path: string, content: string, options?: WriteOptions): Promise<void>
+  readTextIfExists(path: string): Promise<string | null>
+  writeBytes(path: string, content: Uint8Array): Promise<void>
+  writeJson(path: string, value: unknown): Promise<void>
+  writeText(path: string, content: string): Promise<void>
 }

@@ -3,43 +3,17 @@ import {
   getFragmentInternalIndexPath,
   getInternalStoryRoot,
   getLegacyProseFragmentIndexPath,
-} from '../md-files/paths'
-import { buildProseInternalFields, type ProseFragmentInternalFields } from '../md-files/prose-metadata'
-import { createLogger } from '../logging/logger'
-import { getStorageBackend } from './runtime'
+} from '../../md-files/paths'
+import { buildProseInternalFields, type ProseFragmentInternalFields } from '../../md-files/prose-metadata'
+import { createLogger } from '../../logging/logger'
+import { getStorageBackend } from '../runtime'
+import { createKeyedSerialQueue } from './keyed-operations'
 
 const logger = createLogger('fragment-internals')
-const pendingStoryIndexWrites = new Map<string, Promise<void>>()
+const runStoryIndexWrite = createKeyedSerialQueue()
 
 function getStoryIndexWriteKey(dataDir: string, storyId: string): string {
   return `${dataDir}::${storyId}`
-}
-
-async function enqueueStoryIndexWrite<T>(
-  dataDir: string,
-  storyId: string,
-  operation: () => Promise<T>,
-): Promise<T> {
-  const key = getStoryIndexWriteKey(dataDir, storyId)
-  const previous = pendingStoryIndexWrites.get(key) ?? Promise.resolve()
-  let result!: T
-
-  const next = previous
-    .catch(() => {})
-    .then(async () => {
-      result = await operation()
-    })
-
-  pendingStoryIndexWrites.set(key, next)
-
-  try {
-    await next
-    return result
-  } finally {
-    if (pendingStoryIndexWrites.get(key) === next) {
-      pendingStoryIndexWrites.delete(key)
-    }
-  }
 }
 
 export interface FragmentInternalRecord {
@@ -84,10 +58,10 @@ async function readLegacyProseFragmentIndex(
 ): Promise<Record<string, FragmentInternalRecord>> {
   const storage = getStorageBackend()
   const legacyPath = getLegacyProseFragmentIndexPath(dataDir, storyId)
-  if (!(await storage.exists(legacyPath))) return {}
+  const raw = await storage.readTextIfExists(legacyPath)
+  if (!raw) return {}
 
   try {
-    const raw = await storage.readText(legacyPath)
     return migrateLegacyProseIndex(JSON.parse(raw) as Record<string, LegacyProseFragmentInternalRecord>)
   } catch (error) {
     logger.warn('Failed to parse legacy prose fragment index; continuing without it', {
@@ -107,16 +81,14 @@ export async function readFragmentInternalIndex(
   const indexPath = getFragmentInternalIndexPath(dataDir, storyId)
   let current: Record<string, FragmentInternalRecord> = {}
 
-  if (await storage.exists(indexPath)) {
-    try {
-      current = await storage.readJson<Record<string, FragmentInternalRecord>>(indexPath)
-    } catch (error) {
-      logger.warn('Failed to parse fragment internal index; continuing with empty index', {
-        storyId,
-        path: indexPath,
-        error: error instanceof Error ? error.message : String(error),
-      })
-    }
+  try {
+    current = (await storage.readJsonIfExists<Record<string, FragmentInternalRecord>>(indexPath)) ?? {}
+  } catch (error) {
+    logger.warn('Failed to parse fragment internal index; continuing with empty index', {
+      storyId,
+      path: indexPath,
+      error: error instanceof Error ? error.message : String(error),
+    })
   }
 
   const legacy = await readLegacyProseFragmentIndex(dataDir, storyId)
@@ -134,7 +106,6 @@ async function writeFragmentInternalIndex(
   index: Record<string, FragmentInternalRecord>,
 ): Promise<void> {
   const storage = getStorageBackend()
-  await storage.ensureDir(getInternalStoryRoot(dataDir, storyId))
   await storage.writeJson(getFragmentInternalIndexPath(dataDir, storyId), index)
 
   const legacyPath = getLegacyProseFragmentIndexPath(dataDir, storyId)
@@ -167,7 +138,7 @@ export async function upsertFragmentInternalRecord(
   storyId: string,
   fragment: Fragment,
 ): Promise<void> {
-  await enqueueStoryIndexWrite(dataDir, storyId, async () => {
+  await runStoryIndexWrite(getStoryIndexWriteKey(dataDir, storyId), async () => {
     const index = await readFragmentInternalIndex(dataDir, storyId)
     index[fragment.id] = buildFragmentInternalRecord(fragment)
     await writeFragmentInternalIndex(dataDir, storyId, index)
@@ -179,7 +150,7 @@ export async function removeFragmentInternalRecord(
   storyId: string,
   fragmentId: string,
 ): Promise<void> {
-  await enqueueStoryIndexWrite(dataDir, storyId, async () => {
+  await runStoryIndexWrite(getStoryIndexWriteKey(dataDir, storyId), async () => {
     const index = await readFragmentInternalIndex(dataDir, storyId)
     if (!(fragmentId in index)) return
     delete index[fragmentId]

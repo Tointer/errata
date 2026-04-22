@@ -1,4 +1,3 @@
-import { readdir } from 'node:fs/promises'
 import type { LogEntry, LogSummary } from './types'
 import { getAppLogFilePath, getAppLogsDir } from '../storage/paths'
 import { getStorageBackend } from '../storage/runtime'
@@ -48,7 +47,7 @@ export async function saveLogEntry(dataDir: string, entry: LogEntry): Promise<vo
       const newPath = logFilePath(dataDir, i)
       if (await storage.exists(oldPath)) {
         const content = await storage.readText(oldPath)
-        await storage.writeText(newPath, content, { ensureDir: true })
+        await storage.writeText(newPath, content)
       }
     }
     currentIndex = MAX_LOG_FILES - 1
@@ -58,8 +57,8 @@ export async function saveLogEntry(dataDir: string, entry: LogEntry): Promise<vo
   const line = JSON.stringify(entry) + '\n'
   
   // Append to file
-  const existing = await storage.exists(path) ? await storage.readText(path) : ''
-  await storage.writeText(path, existing + line, { ensureDir: true })
+  const existing = (await storage.readTextIfExists(path)) ?? ''
+  await storage.writeText(path, existing + line)
 }
 
 /**
@@ -142,12 +141,10 @@ export async function getLogEntry(dataDir: string, logId: string): Promise<LogEn
 export async function clearLogs(dataDir: string): Promise<void> {
   const storage = getStorageBackend()
   const dir = logsDir(dataDir)
-  if (!(await storage.exists(dir))) return
-
-  const entries = await readdir(dir)
+  const entries = await storage.listDir(dir)
   for (const entry of entries) {
     if (entry.startsWith('app-') && entry.endsWith('.jsonl')) {
-      await storage.writeText(logFilePath(dataDir, Number.parseInt(entry.slice(4, -6), 10)), '', { ensureDir: true })
+      await storage.writeText(logFilePath(dataDir, Number.parseInt(entry.slice(4, -6), 10)), '')
     }
   }
 }

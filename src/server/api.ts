@@ -4,8 +4,7 @@ import { pluginRegistry } from './plugins/registry'
 import { getRuntimePluginUi } from './plugins/runtime-ui'
 import { instructionRegistry } from './instructions'
 import { dirname, extname, resolve } from 'node:path'
-import { existsSync } from 'node:fs'
-import { readFile } from 'node:fs/promises'
+import { getStorageBackend } from './storage/runtime'
 
 import { storyRoutes } from './routes/stories'
 import { branchRoutes } from './routes/branches'
@@ -42,7 +41,13 @@ function contentTypeForPath(path: string): string {
   }
 }
 
-export function createApp(dataDir: string = DATA_DIR, globalDataDir: string = GLOBAL_DATA_DIR) {
+function responseBodyFromBytes(bytes: Uint8Array): ArrayBuffer {
+  const copy = new Uint8Array(bytes.byteLength)
+  copy.set(bytes)
+  return copy.buffer
+}
+
+export async function createApp(dataDir: string = DATA_DIR, globalDataDir: string = GLOBAL_DATA_DIR) {
   const app = new Elysia({ prefix: '/api' })
     .use(openapi({
       documentation: {
@@ -89,6 +94,7 @@ export function createApp(dataDir: string = DATA_DIR, globalDataDir: string = GL
       })
     }, { detail: { tags: ['Plugins'], summary: 'List all plugins' } })
     .get('/plugins/:pluginName/ui/*', async ({ params, set }) => {
+      const storage = getStorageBackend()
       const runtimeUi = getRuntimePluginUi(params.pluginName)
       if (!runtimeUi) {
         set.status = 404
@@ -107,12 +113,13 @@ export function createApp(dataDir: string = DATA_DIR, globalDataDir: string = GL
         return { error: 'Access denied' }
       }
 
-      if (!existsSync(targetPath)) {
+      if (!(await storage.exists(targetPath))) {
         set.status = 404
         return { error: 'Plugin asset not found' }
       }
 
-      return new Response(await readFile(targetPath), {
+      const asset = await storage.readBytes(targetPath)
+      return new Response(responseBodyFromBytes(asset), {
         headers: {
           'content-type': contentTypeForPath(targetPath),
           'cache-control': 'no-cache',
@@ -135,7 +142,7 @@ export function createApp(dataDir: string = DATA_DIR, globalDataDir: string = GL
     .use(folderRoutes(dataDir))
 
   // Load instruction overrides after agents are registered (route imports trigger agent registration)
-  instructionRegistry.loadOverridesSync(globalDataDir)
+  await instructionRegistry.loadOverrides(globalDataDir)
 
   // Mount plugin routes
   for (const plugin of pluginRegistry.listAll()) {

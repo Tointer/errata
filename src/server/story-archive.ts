@@ -34,12 +34,10 @@ export async function exportStoryAsZip(
 
   const zipRoot = 'errata-story-export'
   const files = Object.fromEntries(
-    await Promise.all(
-      (await storage.listTree(storyDir)).map(async (relativePath) => [
-        `${zipRoot}/${relativePath}`,
-        await storage.readBytes(join(storyDir, relativePath)),
-      ] as const),
-    ),
+    Object.entries(await storage.readTree(storyDir)).map(([relativePath, content]) => [
+      `${zipRoot}/${relativePath}`,
+      content,
+    ] as const),
   )
 
   // Ensure branches.json reflects migrated state
@@ -137,7 +135,7 @@ async function importMarkdownStoryFormat(
     const relativePath = rootPrefix ? path.slice(rootPrefix.length) : path
     if (!relativePath || relativePath === 'branches.json' || relativePath === '.errata/_story.md') continue
 
-    await storage.writeBytes(join(root, relativePath), content, { ensureDir: true })
+    await storage.writeBytes(join(root, relativePath), content)
   }
 }
 
@@ -167,7 +165,7 @@ async function importNewFormat(
   }
 
   // Write branches.json (overwrite the default one from createStory)
-  await storage.writeJson(join(storyDir, 'branches.json'), branchesIndex, { ensureDir: true })
+  await storage.writeJson(join(storyDir, 'branches.json'), branchesIndex)
 
   // Write each branch
   for (const branch of branchesIndex.branches) {
@@ -241,7 +239,6 @@ async function importLegacyFormat(
     await storage.writeJson(
       join(fragmentsDir, `${fragment.id}.json`),
       fragment,
-      { ensureDir: true },
     )
   }
 
@@ -278,7 +275,7 @@ async function importLegacyFormat(
     if (logData.fragmentId && idMap.has(logData.fragmentId)) {
       logData.fragmentId = idMap.get(logData.fragmentId)
     }
-    await storage.writeJson(join(logsDir, filename), logData, { ensureDir: true })
+    await storage.writeJson(join(logsDir, filename), logData)
   }
 
   // Copy all remaining files verbatim (librarian, agent-blocks, block-config, etc.)
@@ -294,7 +291,7 @@ async function importLegacyFormat(
     if (relativePath === 'prose-chain.json' || relativePath === 'associations.json') continue
     if (handledLegacy.has(path)) continue
     const targetPath = join(root, normalizeLegacyStoryRelativePath(relativePath))
-    await storage.writeBytes(targetPath, content, { ensureDir: true })
+    await storage.writeBytes(targetPath, content)
   }
 }
 
@@ -386,7 +383,6 @@ async function writeBranchFragments(
     await storage.writeJson(
       join(bDir, 'fragments', `${newId}.json`),
       remapped,
-      { ensureDir: true },
     )
   }
 }
@@ -410,7 +406,7 @@ async function writeBranchProseChain(
       active: idMap.get(entry.active) ?? entry.active,
     })),
   }
-  await storage.writeJson(join(bDir, 'prose-chain.json'), remapped, { ensureDir: true })
+  await storage.writeJson(join(bDir, 'prose-chain.json'), remapped)
 }
 
 async function writeBranchAssociations(
@@ -427,7 +423,7 @@ async function writeBranchAssociations(
   handled.add(key)
   const assoc = JSON.parse(decoder.decode(extracted[key])) as Associations
   const remapped = remapAssociations(assoc, idMap)
-  await storage.writeJson(join(bDir, 'associations.json'), remapped, { ensureDir: true })
+  await storage.writeJson(join(bDir, 'associations.json'), remapped)
 }
 
 async function writeBranchGenerationLogs(
@@ -450,7 +446,7 @@ async function writeBranchGenerationLogs(
     const logsDir = join(bDir, 'generation-logs')
     await storage.ensureDir(logsDir)
     const filename = path.split('/').pop()!
-    await storage.writeJson(join(logsDir, filename), logData, { ensureDir: true })
+    await storage.writeJson(join(logsDir, filename), logData)
   }
 }
 
@@ -467,7 +463,7 @@ async function copyRemainingBranchFiles(
     if (!path.startsWith(prefix) || handled.has(path)) continue
     const relativePath = path.slice(prefix.length)
     const targetPath = join(bDir, relativePath)
-    await storage.writeBytes(targetPath, content, { ensureDir: true })
+    await storage.writeBytes(targetPath, content)
   }
 }
 

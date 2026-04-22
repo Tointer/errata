@@ -4,7 +4,7 @@ import { registry } from '../fragments/registry'
 import { serializeFrontmatter } from './frontmatter'
 import { getFilenameDerivedFragmentId, isVisibleFilenameDerivedType } from './paths'
 import { splitProseInternalMeta } from './prose-metadata'
-import { resolveFragmentTimestamps, type FragmentInternalRecord } from '../storage/fragment-internals'
+import { resolveFragmentTimestamps, type FragmentInternalRecord } from '../storage/stores/fragment-internals'
 
 const MARKDOWN_EDITABLE_DELIMITER = '<!-- editable -->'
 const MARKDOWN_LEADING_FROZEN_SECTION_ID = 'fs-md-leading'

@@ -20,10 +20,7 @@ export async function getProseChain(
 ): Promise<ProseChain | null> {
   const storage = getStorageBackend()
   const path = await proseChainPath(dataDir, storyId)
-  if (!(await storage.exists(path))) {
-    return null
-  }
-  return storage.readJson(path)
+  return storage.readJsonIfExists(path)
 }
 
 /**
@@ -37,7 +34,7 @@ export async function saveProseChain(
   const storage = getStorageBackend()
   const markdownRepository = getMarkdownStoryRepository()
   const path = await proseChainPath(dataDir, storyId)
-  await storage.writeJson(path, chain, { ensureDir: true })
+  await storage.writeJson(path, chain)
   await markdownRepository.syncProseOrder(dataDir, storyId)
   await markdownRepository.syncCompiledStory(dataDir, storyId)
 }

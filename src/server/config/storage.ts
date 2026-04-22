@@ -1,7 +1,6 @@
-import { promises as fs } from 'node:fs'
 import { join } from 'node:path'
 import { GlobalConfigSchema, type GlobalConfig, type ProviderConfig } from './schema'
-import { writeJsonAtomic } from '../fs-utils'
+import { getStorageBackend } from '../storage/runtime'
 
 function resolveConfigDataDir(dataDir: string): string {
   return process.env.GLOBAL_DATA_DIR?.trim() || dataDir
@@ -12,8 +11,9 @@ function configPath(dataDir: string): string {
 }
 
 export async function getGlobalConfig(dataDir: string): Promise<GlobalConfig> {
+  const storage = getStorageBackend()
   try {
-    const raw = await fs.readFile(configPath(dataDir), 'utf-8')
+    const raw = await storage.readText(configPath(dataDir))
     return GlobalConfigSchema.parse(JSON.parse(raw))
   } catch {
     return { providers: [], defaultProviderId: null }
@@ -21,8 +21,8 @@ export async function getGlobalConfig(dataDir: string): Promise<GlobalConfig> {
 }
 
 export async function saveGlobalConfig(dataDir: string, config: GlobalConfig): Promise<void> {
-  await fs.mkdir(resolveConfigDataDir(dataDir), { recursive: true })
-  await writeJsonAtomic(configPath(dataDir), config)
+  const storage = getStorageBackend()
+  await storage.writeJson(configPath(dataDir), config)
 }
 
 export async function addProvider(dataDir: string, provider: ProviderConfig): Promise<GlobalConfig> {

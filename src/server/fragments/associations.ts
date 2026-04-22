@@ -16,10 +16,11 @@ export async function getAssociations(
 ): Promise<Associations> {
   const storage = getStorageBackend()
   const path = await associationsPath(dataDir, storyId)
-  if (!(await storage.exists(path))) {
+  const assoc = await storage.readJsonIfExists<Associations>(path)
+  if (!assoc) {
     return { tagIndex: {}, refIndex: {} }
   }
-  return AssociationsSchema.parse(await storage.readJson(path))
+  return AssociationsSchema.parse(assoc)
 }
 
 export async function saveAssociations(
@@ -29,7 +30,7 @@ export async function saveAssociations(
 ): Promise<void> {
   const storage = getStorageBackend()
   const path = await associationsPath(dataDir, storyId)
-  await storage.writeJson(path, assoc, { ensureDir: true })
+  await storage.writeJson(path, assoc)
 }
 
 // --- Tag operations ---

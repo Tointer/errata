@@ -127,7 +127,7 @@ function createMockStreamResult(text: string) {
 describe('generation endpoint', () => {
   let dataDir: string
   let cleanup: () => Promise<void>
-  let app: ReturnType<typeof createApp>
+  let app: Awaited<ReturnType<typeof createApp>>
   const storyId = 'story-test'
 
   async function api(path: string, init?: RequestInit) {
@@ -143,7 +143,7 @@ describe('generation endpoint', () => {
     dataDir = tmp.path
     cleanup = tmp.cleanup
     await seedTestProvider(dataDir)
-    app = createApp(dataDir)
+    app = await createApp(dataDir)
     await createStory(dataDir, makeStory())
     vi.clearAllMocks()
   })
@@ -198,6 +198,7 @@ describe('generation endpoint', () => {
         },
       },
       blockOrder: [],
+      disableAutoAnalysis: false,
       disabledTools: [],
     })
 
@@ -236,6 +237,7 @@ describe('generation endpoint', () => {
         },
       },
       blockOrder: [],
+      disableAutoAnalysis: false,
       disabledTools: [],
     })
 
@@ -338,6 +340,7 @@ describe('generation endpoint', () => {
       customBlocks: [],
       overrides: {},
       blockOrder: [],
+      disableAutoAnalysis: false,
       disabledTools: ['listFragments', 'getFragment', 'searchFragments'],
     })
 

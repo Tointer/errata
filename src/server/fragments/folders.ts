@@ -1,8 +1,6 @@
-import { readFile } from 'node:fs/promises'
 import { join } from 'node:path'
-import { existsSync } from 'node:fs'
 import { generateFolderId } from '@/lib/fragment-ids'
-import { writeJsonAtomic } from '../fs-utils'
+import { getStorageBackend } from '../storage/runtime'
 
 export interface Folder {
   id: string
@@ -24,9 +22,10 @@ function foldersPath(dataDir: string, storyId: string): string {
 }
 
 async function readIndex(dataDir: string, storyId: string): Promise<FoldersIndex> {
+  const storage = getStorageBackend()
   const path = foldersPath(dataDir, storyId)
-  if (!existsSync(path)) return { folders: [], assignments: {} }
-  const raw = await readFile(path, 'utf-8')
+  const raw = await storage.readTextIfExists(path)
+  if (!raw) return { folders: [], assignments: {} }
   const parsed = JSON.parse(raw) as Partial<FoldersIndex>
   return {
     folders: parsed.folders ?? [],
@@ -35,8 +34,9 @@ async function readIndex(dataDir: string, storyId: string): Promise<FoldersIndex
 }
 
 async function writeIndex(dataDir: string, storyId: string, index: FoldersIndex): Promise<void> {
+  const storage = getStorageBackend()
   const path = foldersPath(dataDir, storyId)
-  await writeJsonAtomic(path, index)
+  await storage.writeJson(path, index)
 }
 
 export async function listFolders(dataDir: string, storyId: string): Promise<Folder[]> {

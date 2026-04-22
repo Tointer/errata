@@ -1,7 +1,5 @@
-import { existsSync } from 'node:fs'
-import { readdir } from 'node:fs/promises'
 import { join } from 'node:path'
-import { mkdirWithRetries, readFileWithRetries, writeJsonAtomic } from '../fs-utils'
+import { getStorageBackend } from '../storage/runtime'
 
 export interface GenerationFailureLog {
   id: string
@@ -32,23 +30,23 @@ export async function saveGenerationFailureLog(
   dataDir: string,
   log: GenerationFailureLog,
 ): Promise<string> {
+  const storage = getStorageBackend()
   const dir = failureLogsDir(dataDir)
-  await mkdirWithRetries(dir, { recursive: true })
+  await storage.ensureDir(dir)
   const path = failureLogPath(dataDir, log.id)
-  await writeJsonAtomic(path, log)
+  await storage.writeJson(path, log)
   return path
 }
 
 export async function listGenerationFailureLogs(dataDir: string): Promise<GenerationFailureLog[]> {
+  const storage = getStorageBackend()
   const dir = failureLogsDir(dataDir)
-  if (!existsSync(dir)) return []
-
-  const entries = await readdir(dir)
+  const entries = await storage.listDir(dir)
   const logs: GenerationFailureLog[] = []
 
   for (const entry of entries) {
     if (!entry.endsWith('.json')) continue
-    const raw = await readFileWithRetries(join(dir, entry), 'utf-8')
+    const raw = await storage.readText(join(dir, entry))
     logs.push(JSON.parse(raw) as GenerationFailureLog)
   }
 

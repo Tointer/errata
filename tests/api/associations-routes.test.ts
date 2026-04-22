@@ -41,7 +41,7 @@ function makeFragment(overrides: Partial<Fragment>): Fragment {
 describe('association & sticky API routes', () => {
   let dataDir: string
   let cleanup: () => Promise<void>
-  let app: ReturnType<typeof createApp>
+  let app: Awaited<ReturnType<typeof createApp>>
   const storyId = 'story-test'
 
   async function api(path: string, init?: RequestInit) {
@@ -53,7 +53,7 @@ describe('association & sticky API routes', () => {
     const tmp = await createTempDir()
     dataDir = tmp.path
     cleanup = tmp.cleanup
-    app = createApp(dataDir)
+    app = await createApp(dataDir)
     await createStory(dataDir, makeStory())
   })
 

@@ -61,7 +61,7 @@ import { saveGenerationLog, type GenerationLog } from '@/server/llm/generation-l
 describe('generation-logs API routes', () => {
   let dataDir: string
   let cleanup: () => Promise<void>
-  let app: ReturnType<typeof createApp>
+  let app: Awaited<ReturnType<typeof createApp>>
   const storyId = 'story-logtest'
 
   function makeLog(overrides: Partial<GenerationLog> = {}): GenerationLog {
@@ -90,7 +90,7 @@ describe('generation-logs API routes', () => {
     dataDir = tmp.path
     cleanup = tmp.cleanup
     await seedTestProvider(dataDir)
-    app = createApp(dataDir)
+    app = await createApp(dataDir)
 
     await createStory(dataDir, {
       id: storyId,

@@ -1,4 +1,4 @@
-import { getCharacterChatConversationFile, getCharacterChatConversationsDir } from '../storage/paths'
+import { getCharacterChatConversationFile, getCharacterChatConversationsDir, getCharacterChatDir } from '../storage/paths'
 import { getStorageBackend } from '../storage/runtime'
 
 // --- Types ---
@@ -48,7 +48,7 @@ export function generateConversationId(): string {
 // --- Path helpers ---
 
 async function characterChatDir(dataDir: string, storyId: string): Promise<string> {
-  return getCharacterChatConversationsDir(dataDir, storyId).replace(/\\conversations$/, '')
+  return getCharacterChatDir(dataDir, storyId)
 }
 
 async function conversationsDir(dataDir: string, storyId: string): Promise<string> {
@@ -68,8 +68,6 @@ export async function saveConversation(
   conversation: CharacterChatConversation,
 ): Promise<void> {
   const storage = getStorageBackend()
-  const dir = await conversationsDir(dataDir, storyId)
-  await storage.ensureDir(dir)
   await storage.writeJson(await conversationPath(dataDir, storyId, conversation.id), conversation)
 }
 
@@ -80,8 +78,7 @@ export async function getConversation(
 ): Promise<CharacterChatConversation | null> {
   const storage = getStorageBackend()
   const path = await conversationPath(dataDir, storyId, conversationId)
-  if (!(await storage.exists(path))) return null
-  return storage.readJson(path)
+  return storage.readJsonIfExists(path)
 }
 
 export async function listConversations(
@@ -91,8 +88,6 @@ export async function listConversations(
 ): Promise<CharacterChatConversationSummary[]> {
   const storage = getStorageBackend()
   const dir = await conversationsDir(dataDir, storyId)
-  if (!(await storage.exists(dir))) return []
-
   const entries = await storage.listDir(dir)
   const summaries: CharacterChatConversationSummary[] = []
 

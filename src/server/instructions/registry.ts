@@ -1,6 +1,6 @@
-import { readdirSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { InstructionSetSchema, type InstructionSet } from './schema'
+import { getStorageBackend } from '../storage/runtime'
 
 interface ParsedOverride {
   name: string
@@ -52,23 +52,18 @@ class InstructionRegistry {
     return [...this.defaults.keys()]
   }
 
-  loadOverridesSync(dataDir: string): void {
+  async loadOverrides(dataDir: string): Promise<void> {
     this.overrides = []
     const dir = join(dataDir, 'instruction-sets')
-
-    let entries: string[]
-    try {
-      entries = readdirSync(dir)
-    } catch {
-      return
-    }
+    const storage = getStorageBackend()
+    const entries = await storage.listDir(dir)
 
     const parsed: ParsedOverride[] = []
 
     for (const entry of entries) {
       if (!entry.endsWith('.json')) continue
       try {
-        const raw = readFileSync(join(dir, entry), 'utf-8')
+        const raw = await storage.readText(join(dir, entry))
         const data = JSON.parse(raw)
         const result = InstructionSetSchema.safeParse(data)
         if (!result.success) {
