@@ -78,16 +78,10 @@ function StoryListPage() {
       return
     }
 
-    let cancelled = false
-
     refreshDesktopInfo()
       .catch((error) => {
         console.error('[desktop] Failed to load vault info', error)
       })
-
-    return () => {
-      cancelled = true
-    }
   }, [refreshDesktopInfo])
 
   const resetRendererAfterVaultSwitch = useCallback(async () => {
@@ -965,9 +959,14 @@ function StoryCard({ story, onDelete }: { story: StoryMeta; onDelete: () => void
   }, [updateCoverMutation])
 
   // Compute stats from fragments
-  const stats = null
+  const stats = {
+    prose: 0,
+    characters: 0,
+    knowledge: 0,
+    guidelines: 0,
+  }
 
-  const hasStats = stats && (stats.prose + stats.characters + stats.knowledge + stats.guidelines) > 0
+  const hasStats = (stats.prose + stats.characters + stats.knowledge + stats.guidelines) > 0
   const hasCover = !!story.coverImage
   // Light-mode generated covers have light parchment backgrounds → need dark text
   const isLightCover = !hasCover && theme === 'light'

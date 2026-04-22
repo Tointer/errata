@@ -1,5 +1,4 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
-import { mkdir, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { existsSync } from 'node:fs'
 import { createTempDir } from '../setup'
@@ -38,6 +37,7 @@ function makeStory(id: string = TEST_STORY_ID): StoryMeta {
       maxSteps: 10,
       modelOverrides: {},
       generationMode: 'standard' as const,
+      disableLibrarianAutoAnalysis: false,
       autoApplyLibrarianSuggestions: false,
       disableLibrarianDirections: false,
       disableLibrarianSuggestions: false,
@@ -46,6 +46,7 @@ function makeStory(id: string = TEST_STORY_ID): StoryMeta {
       contextCompact: { type: 'proseLimit', value: 10 },
       summaryCompact: { maxCharacters: 12000, targetCharacters: 9000 },
       enableHierarchicalSummary: false,
+      disableThinking: false,
     },
   }
 }

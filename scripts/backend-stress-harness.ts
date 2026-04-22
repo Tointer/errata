@@ -240,6 +240,7 @@ async function seedStory(dataDir: string, options: HarnessOptions): Promise<{
       maxSteps: 10,
       modelOverrides: {},
       generationMode: 'standard' as const,
+      disableLibrarianAutoAnalysis: false,
       autoApplyLibrarianSuggestions: false,
       disableLibrarianDirections: false,
       disableLibrarianSuggestions: false,
@@ -248,6 +249,7 @@ async function seedStory(dataDir: string, options: HarnessOptions): Promise<{
       contextCompact: { type: options.compactType, value: options.compactValue },
       summaryCompact: { maxCharacters: 12000, targetCharacters: 9000 },
       enableHierarchicalSummary: true,
+      disableThinking: false,
     },
   })
 

@@ -75,7 +75,7 @@ function ProviderQuickSwitch({
         providerMutation.mutate({ providerId, modelId: null })
       }}
       disabled={providerMutation.isPending || isStreamingAction}
-      className="text-[0.625rem] text-muted-foreground bg-transparent hover:bg-muted/40 border border-border/30 hover:border-border/50 rounded outline-none cursor-pointer transition-all appearance-none pl-1.5 pr-4 py-0.5 font-mono max-w-[140px] truncate disabled:opacity-30 focus:ring-1 focus:ring-primary/20"
+      className="text-[0.625rem] text-muted-foreground bg-transparent hover:bg-muted/40 border border-border/30 hover:border-border/50 rounded outline-none cursor-pointer transition-all appearance-none pl-1.5 pr-4 py-0.5 font-mono max-w-35 truncate disabled:opacity-30 focus:ring-1 focus:ring-primary/20"
       style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='7' height='7' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2.5' stroke-linecap='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E")`, backgroundRepeat: 'no-repeat', backgroundPosition: 'right 4px center' }}
     >
       <option value="">
@@ -418,7 +418,7 @@ export const ProseBlock = memo(function ProseBlock({
     <div ref={blockRef} className="group relative mb-6" data-prose-index={displayIndex} data-component-id={`prose-${fragment.id}-block`}>
       {/* Analyzed indicator — subtle dot in the top-right corner */}
       {hasAnalysis && (
-        <div className="absolute -top-1 -right-1 z-[1]" title="Analyzed by librarian">
+        <div className="absolute -top-1 -right-1 z-1" title="Analyzed by librarian">
           <div className="size-2 rounded-full bg-emerald-500/70 shadow-[0_0_4px_rgba(16,185,129,0.3)]" />
         </div>
       )}
@@ -479,7 +479,7 @@ export const ProseBlock = memo(function ProseBlock({
               }}
               title="Click to edit prompt and regenerate"
             >
-              <div className="w-0.5 min-h-[1.25rem] rounded-full bg-primary/20 group-hover/prompt:bg-primary/45 transition-colors shrink-0 mt-0.5" />
+              <div className="w-0.5 min-h-5 rounded-full bg-primary/20 group-hover/prompt:bg-primary/45 transition-colors shrink-0 mt-0.5" />
               <Caption asChild size="sm" className="font-display italic group-hover/prompt:text-muted-foreground truncate transition-colors">
                 <span>{generatedFrom || fragment.description}</span>
               </Caption>
@@ -490,7 +490,7 @@ export const ProseBlock = memo(function ProseBlock({
             </button>
           ) : (
             <div className="flex items-start gap-2.5">
-              <div className="w-0.5 min-h-[1.25rem] rounded-full bg-border/30 shrink-0 mt-0.5" />
+              <div className="w-0.5 min-h-5 rounded-full bg-border/30 shrink-0 mt-0.5" />
               <Caption asChild size="sm" className="font-display italic truncate"><span>{fragment.description}</span></Caption>
               {hasMultiple && (
                 <span className="text-[0.625rem] font-mono text-muted-foreground shrink-0 ml-auto mt-0.5">{variationIndex + 1}/{variationCount}</span>
@@ -573,7 +573,7 @@ export const ProseBlock = memo(function ProseBlock({
         >
           {actionMode ? (
             /* Regenerate input — inline textarea */
-            <div className="w-full max-w-md rounded-xl border border-border/40 bg-popover/95 backdrop-blur-md shadow-lg shadow-black/[0.06] overflow-hidden">
+            <div className="w-full max-w-md rounded-xl border border-border/40 bg-popover/95 backdrop-blur-md shadow-lg shadow-black/6 overflow-hidden">
               <textarea
                 ref={actionInputRef}
                 value={actionInput}
@@ -599,7 +599,7 @@ export const ProseBlock = memo(function ProseBlock({
                     Cancel
                   </button>
                   <button
-                    className="px-2.5 py-0.5 rounded-md text-[0.6875rem] font-medium bg-foreground/[0.07] hover:bg-foreground/[0.12] text-foreground disabled:opacity-30 transition-all"
+                    className="px-2.5 py-0.5 rounded-md text-[0.6875rem] font-medium bg-foreground/[0.07] hover:bg-foreground/12 text-foreground disabled:opacity-30 transition-all"
                     disabled={!actionInput.trim()}
                     onClick={handleActionSubmit}
                   >
@@ -610,7 +610,7 @@ export const ProseBlock = memo(function ProseBlock({
             </div>
           ) : (
             /* Two-tier action toolbar */
-            <div className="flex flex-col rounded-xl border border-border/30 bg-popover/95 backdrop-blur-md shadow-lg shadow-black/[0.06] overflow-hidden min-w-0">
+            <div className="flex flex-col rounded-xl border border-border/30 bg-popover/95 backdrop-blur-md shadow-lg shadow-black/6 overflow-hidden min-w-0">
               {/* Top tier — ID, variation, secondary icon actions */}
               <div className="flex items-center gap-1.5 px-2.5 py-1 min-w-0">
                 <button
@@ -632,7 +632,7 @@ export const ProseBlock = memo(function ProseBlock({
                       >
                         <ChevronLeft className="size-3" />
                       </button>
-                      <span className="text-[0.5625rem] font-mono text-muted-foreground/50 tabular-nums min-w-[1.5rem] text-center">{variationIndex + 1}/{variationCount}</span>
+                      <span className="text-[0.5625rem] font-mono text-muted-foreground/50 tabular-nums min-w-6 text-center">{variationIndex + 1}/{variationCount}</span>
                       <button
                         className="p-0.5 rounded text-muted-foreground/50 hover:text-foreground hover:bg-accent/60 transition-all disabled:opacity-25"
                         disabled={!canNext || switchMutation.isPending}

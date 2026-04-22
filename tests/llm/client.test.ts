@@ -46,6 +46,7 @@ describe('llm client model resolution', () => {
           defaultModel: 'gen-default',
           enabled: true,
           customHeaders: {},
+          temperature: undefined,
           createdAt: new Date().toISOString(),
         },
         {
@@ -57,6 +58,7 @@ describe('llm client model resolution', () => {
           defaultModel: 'lib-default',
           enabled: true,
           customHeaders: {},
+          temperature: undefined,
           createdAt: new Date().toISOString(),
         },
       ],
@@ -87,6 +89,7 @@ describe('llm client model resolution', () => {
           defaultModel: 'gen-default',
           enabled: true,
           customHeaders: {},
+          temperature: undefined,
           createdAt: new Date().toISOString(),
         },
       ],

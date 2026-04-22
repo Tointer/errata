@@ -1,5 +1,5 @@
 import { getModel, buildProviderOptions } from '../llm/client'
-import { ToolLoopAgent, stepCountIs, type ProviderOptions } from 'ai'
+import { ToolLoopAgent, stepCountIs } from 'ai'
 import {
   getStory,
   listFragments,

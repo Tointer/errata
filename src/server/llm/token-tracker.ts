@@ -6,9 +6,8 @@
  * per-story on disk.
  */
 
-import { join } from 'node:path'
 import { createLogger } from '../logging'
-import { getInternalStoryPath, getInternalStoryRoot } from '../md-files/paths'
+import { getInternalStoryPath } from '../md-files/paths'
 import { getStorageBackend } from '../storage/runtime'
 import { createDebouncedKeyedBatchQueue } from '../storage/stores/keyed-operations'
 

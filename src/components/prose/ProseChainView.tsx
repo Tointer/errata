@@ -537,7 +537,7 @@ export function ProseChainView({
               className="w-full h-full object-cover"
               style={{ maxHeight: 280 }}
             />
-            <div className="absolute inset-0 bg-gradient-to-t from-background via-background/20 to-transparent" />
+            <div className="absolute inset-0 bg-linear-to-t from-background via-background/20 to-transparent" />
           </div>
         )}
         <CharacterMentionProvider characters={characterFragments} mediaById={mediaById}>
@@ -667,7 +667,7 @@ export function ProseChainView({
               {onLaunchWizard && (
                 <button
                   onClick={onLaunchWizard}
-                  className="inline-flex items-center gap-2.5 px-6 py-3 rounded-xl border-2 border-primary/20 bg-primary/[0.04] text-sm font-medium text-primary/80 hover:text-primary hover:border-primary/40 hover:bg-primary/[0.08] transition-all duration-200"
+                  className="inline-flex items-center gap-2.5 px-6 py-3 rounded-xl border-2 border-primary/20 bg-primary/4 text-sm font-medium text-primary/80 hover:text-primary hover:border-primary/40 hover:bg-primary/8 transition-all duration-200"
                 >
                   <Wand2 className="size-4" />
                   <span>Story Setup Wizard</span>

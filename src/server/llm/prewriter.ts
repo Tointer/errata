@@ -1,6 +1,6 @@
-import { tool, ToolLoopAgent, stepCountIs, type ToolSet, type ProviderOptions } from 'ai'
+import { tool, ToolLoopAgent, stepCountIs, type ToolSet } from 'ai'
 import { z } from 'zod/v4'
-import { getModel } from './client'
+import { getModel, type ProviderOptions } from './client'
 import { compileBlocks, expandMessagesFragmentTags, type ContextBlock, type ContextMessage } from './context-builder'
 import { compileAgentContext } from '../agents/compile-agent-context'
 import { instructionRegistry } from '../instructions'

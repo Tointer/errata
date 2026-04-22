@@ -725,7 +725,7 @@ export function FragmentEditor({
 
               {contentSegments ? (
                 /* Split editor — editable textareas interleaved with frozen divs */
-                <div className="rounded-md border border-input overflow-hidden min-h-[200px] focus-within:ring-1 focus-within:ring-ring">
+                <div className="rounded-md border border-input overflow-hidden min-h-50 focus-within:ring-1 focus-within:ring-ring">
                   {contentSegments.map((seg, i) =>
                     seg.type === 'editable' ? (
                       <textarea
@@ -752,7 +752,7 @@ export function FragmentEditor({
                         className="block w-full px-3 py-1.5 font-mono text-sm leading-relaxed bg-transparent resize-none border-none outline-none focus:ring-0 focus-visible:ring-0"
                       />
                     ) : (
-                      <div key={seg.id} className="group relative bg-sky-500/[0.06] dark:bg-sky-400/[0.06]">
+                      <div key={seg.id} className="group relative bg-sky-500/6 dark:bg-sky-400/6">
                         <div className="absolute inset-y-0 left-0 w-0.5 bg-sky-500/40" />
                         <div className="flex items-start gap-2 pl-3 pr-2 py-1.5">
                           <pre className="flex-1 min-w-0 font-mono text-sm leading-relaxed whitespace-pre-wrap text-foreground/80">
@@ -824,8 +824,8 @@ export function FragmentEditor({
                 <div className="mt-2 flex flex-wrap items-center gap-1.5">
                   <span className="text-[0.625rem] text-amber-600 dark:text-amber-400/70">Orphaned:</span>
                   {orphanedFrozen.map((s) => (
-                    <span key={s.id} className="inline-flex items-center gap-1 h-5 px-1.5 rounded border border-amber-500/20 bg-amber-500/[0.05] text-[0.625rem] text-amber-700 dark:text-amber-400/60">
-                      <span className="max-w-[120px] truncate">{s.text}</span>
+                    <span key={s.id} className="inline-flex items-center gap-1 h-5 px-1.5 rounded border border-amber-500/20 bg-amber-500/5 text-[0.625rem] text-amber-700 dark:text-amber-400/60">
+                      <span className="max-w-30 truncate">{s.text}</span>
                       <button type="button" onClick={() => unfreezeSection(s.id)} className="hover:text-destructive transition-colors">&times;</button>
                     </span>
                   ))}
@@ -896,7 +896,7 @@ export function FragmentEditor({
                         </Button>
                       </div>
                       <p className="text-[0.625rem] text-muted-foreground">`-` current content, `+` selected version</p>
-                      <pre className="max-h-40 overflow-auto whitespace-pre-wrap break-words rounded border border-border/30 bg-background/50 p-2 text-[0.6875rem] leading-4">
+                      <pre className="max-h-40 overflow-auto whitespace-pre-wrap wrap-break-word rounded border border-border/30 bg-background/50 p-2 text-[0.6875rem] leading-4">
                         {versionDiffLines.join('\n') || 'No content differences.'}
                       </pre>
                     </div>

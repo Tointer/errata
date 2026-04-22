@@ -1,7 +1,7 @@
 import type { Fragment } from '@/server/fragments/schema'
 import { getFrozenSections, type FrozenSection } from '../fragments/protection'
 import { registry } from '../fragments/registry'
-import { serializeFrontmatter } from './frontmatter'
+import { normalizeLineEndings, serializeFrontmatter } from './frontmatter'
 import { getFilenameDerivedFragmentId, isVisibleFilenameDerivedType } from './paths'
 import { splitProseInternalMeta } from './prose-metadata'
 import { resolveFragmentTimestamps, type FragmentInternalRecord } from '../storage/stores/fragment-internals'
@@ -49,11 +49,53 @@ function combineBodyParts(frozenPart: string, editablePart: string): string {
   return frozenPart || editablePart
 }
 
+function readRawMeta(attributes: Record<string, unknown>): Record<string, unknown> {
+  return typeof attributes.meta === 'object' && attributes.meta !== null
+    ? attributes.meta as Record<string, unknown>
+    : {}
+}
+
+function readStringArray(value: unknown): string[] {
+  return Array.isArray(value)
+    ? value.filter((entry): entry is string => typeof entry === 'string')
+    : []
+}
+
+function buildFragmentFromParsedMarkdown(
+  id: string,
+  type: string,
+  name: string,
+  attributes: Record<string, unknown>,
+  body: string,
+  internalRecord?: FragmentInternalRecord,
+): Fragment {
+  const timestamps = resolveFragmentTimestamps(attributes, internalRecord)
+  const bodyFreeze = extractMarkdownFrozenMeta(type, body, readRawMeta(attributes))
+
+  return {
+    id,
+    type,
+    name,
+    description: typeof attributes.description === 'string' ? attributes.description : '',
+    content: bodyFreeze.content,
+    tags: readStringArray(attributes.tags),
+    refs: readStringArray(attributes.refs),
+    sticky: resolveSticky(type, attributes),
+    placement: attributes.placement === 'system' ? 'system' : 'user',
+    createdAt: timestamps.createdAt,
+    updatedAt: timestamps.updatedAt,
+    order: typeof attributes.order === 'number' ? attributes.order : 0,
+    meta: bodyFreeze.meta,
+    version: 1,
+    versions: [],
+  }
+}
+
 function splitMarkdownEditableBody(body: string): {
   content: string
   leadingFrozenText: string | null
 } {
-  const normalized = body.replace(/\r\n/g, '\n')
+  const normalized = normalizeLineEndings(body)
   const lines = normalized.split('\n')
   const delimiterIndex = lines.findIndex((line) => line.trim() === MARKDOWN_EDITABLE_DELIMITER)
 
@@ -84,7 +126,7 @@ function extractMarkdownFrozenMeta(type: string, body: string, meta: Record<stri
     return { content: body, meta: metaWithoutInternalMarker }
   }
 
-  const normalizedBody = body.replace(/\r\n/g, '\n')
+  const normalizedBody = normalizeLineEndings(body)
   const { content, leadingFrozenText } = splitMarkdownEditableBody(body)
   const fallbackLeadingFrozenText = type === 'guideline' && storedLeadingFrozen === false && normalizedBody.trim().length > 0
     ? normalizedBody
@@ -201,28 +243,14 @@ export function fragmentFromExplicitMarkdown(
   internalRecord?: FragmentInternalRecord,
 ): Fragment | null {
   if (typeof attributes.id !== 'string' || typeof attributes.type !== 'string') return null
-  const timestamps = resolveFragmentTimestamps(attributes, internalRecord)
-  const rawMeta = typeof attributes.meta === 'object' && attributes.meta !== null
-    ? attributes.meta as Record<string, unknown>
-    : {}
-  const bodyFreeze = extractMarkdownFrozenMeta(attributes.type, body, rawMeta)
-  return {
-    id: attributes.id,
-    type: attributes.type,
-    name: typeof attributes.name === 'string' ? attributes.name : attributes.id,
-    description: typeof attributes.description === 'string' ? attributes.description : '',
-    content: bodyFreeze.content,
-    tags: Array.isArray(attributes.tags) ? attributes.tags.filter((value): value is string => typeof value === 'string') : [],
-    refs: Array.isArray(attributes.refs) ? attributes.refs.filter((value): value is string => typeof value === 'string') : [],
-    sticky: resolveSticky(attributes.type, attributes),
-    placement: attributes.placement === 'system' ? 'system' : 'user',
-    createdAt: timestamps.createdAt,
-    updatedAt: timestamps.updatedAt,
-    order: typeof attributes.order === 'number' ? attributes.order : 0,
-    meta: bodyFreeze.meta,
-    version: 1,
-    versions: [],
-  }
+  return buildFragmentFromParsedMarkdown(
+    attributes.id,
+    attributes.type,
+    typeof attributes.name === 'string' ? attributes.name : attributes.id,
+    attributes,
+    body,
+    internalRecord,
+  )
 }
 
 export function visibleFragmentFromMarkdown(
@@ -233,26 +261,12 @@ export function visibleFragmentFromMarkdown(
   internalRecord?: FragmentInternalRecord,
 ): Fragment {
   const baseName = fileName.replace(/\.md$/i, '')
-  const timestamps = resolveFragmentTimestamps(attributes, internalRecord)
-  const rawMeta = typeof attributes.meta === 'object' && attributes.meta !== null
-    ? attributes.meta as Record<string, unknown>
-    : {}
-  const bodyFreeze = extractMarkdownFrozenMeta(type, body, rawMeta)
-  return {
-    id: getFilenameDerivedFragmentId(type, fileName),
+  return buildFragmentFromParsedMarkdown(
+    getFilenameDerivedFragmentId(type, fileName),
     type,
-    name: baseName,
-    description: typeof attributes.description === 'string' ? attributes.description : '',
-    content: bodyFreeze.content,
-    tags: Array.isArray(attributes.tags) ? attributes.tags.filter((value): value is string => typeof value === 'string') : [],
-    refs: Array.isArray(attributes.refs) ? attributes.refs.filter((value): value is string => typeof value === 'string') : [],
-    sticky: resolveSticky(type, attributes),
-    placement: attributes.placement === 'system' ? 'system' : 'user',
-    createdAt: timestamps.createdAt,
-    updatedAt: timestamps.updatedAt,
-    order: typeof attributes.order === 'number' ? attributes.order : 0,
-    meta: bodyFreeze.meta,
-    version: 1,
-    versions: [],
-  }
+    baseName,
+    attributes,
+    body,
+    internalRecord,
+  )
 }

@@ -2,16 +2,11 @@ import { join } from 'node:path'
 import { zipSync, unzipSync } from 'fflate'
 import { generateFragmentId } from '@/lib/fragment-ids'
 import { createStory, getStory } from './fragments/storage'
-import { saveProseChain } from './fragments/prose-chain'
-import { saveAssociations } from './fragments/associations'
 import { getBranchesIndex, getContentRoot } from './fragments/branches'
 import type { StoryMeta, Fragment, Associations, ProseChain, BranchesIndex } from './fragments/schema'
 import { parseFrontmatter } from './md-files/frontmatter'
 import { storyMetaFromMarkdown } from './md-files/story-meta'
-import {
-  getStoryDir,
-  getStoryInternalDir,
-} from './storage/paths'
+import { getStoryDir } from './storage/paths'
 import { getStorageBackend } from './storage/runtime'
 
 export interface ExportResult {
@@ -118,7 +113,7 @@ export async function importStoryFromZip(
   await createStory(dataDir, newMeta)
 
   if (importMode === 'branched') {
-    await importNewFormat(dataDir, newStoryId, extracted, decoder, branchesKey)
+    await importNewFormat(dataDir, newStoryId, extracted, decoder, branchesKey!)
   } else {
     await importMarkdownStoryFormat(dataDir, newStoryId, extracted, paths)
   }

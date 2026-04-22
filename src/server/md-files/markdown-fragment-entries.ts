@@ -8,6 +8,7 @@ import {
   isVisibleFilenameDerivedType,
   MARKDOWN_FRAGMENT_DIRS,
 } from './paths'
+import type { StorageBackend } from '../storage/backend'
 import { getStorageBackend } from '../storage/runtime'
 
 export interface MarkdownFragmentEntry {
@@ -17,34 +18,48 @@ export interface MarkdownFragmentEntry {
   archived: boolean
 }
 
+function isMarkdownFile(entry: string): boolean {
+  return entry.endsWith('.md')
+}
+
+async function collectMarkdownEntries(
+  storage: StorageBackend,
+  folderPath: string,
+  folder: string,
+  archived: boolean,
+): Promise<MarkdownFragmentEntry[]> {
+  if (!(await storage.exists(folderPath))) return []
+
+  return (await storage.listDir(folderPath))
+    .filter(isMarkdownFile)
+    .map((entry) => ({ path: join(folderPath, entry), folder, entry, archived }))
+}
+
+function getEntryFragmentId(folder: string, entry: string): string | null {
+  if (folder === 'Prose') return getProseFragmentIdFromFileName(entry)
+
+  const visibleType = getTypeForVisibleFolder(folder)
+  if (visibleType && isVisibleFilenameDerivedType(visibleType)) {
+    return getFilenameDerivedFragmentId(visibleType, entry)
+  }
+
+  return null
+}
+
 export async function listFolderEntries(
   folderPath: string,
   folder: string,
   opts: { includeArchived?: boolean; onlyArchived?: boolean },
 ): Promise<MarkdownFragmentEntry[]> {
   const storage = getStorageBackend()
-  const matches: MarkdownFragmentEntry[] = []
+  const liveEntries = opts.onlyArchived
+    ? []
+    : await collectMarkdownEntries(storage, folderPath, folder, false)
+  const archivedEntries = opts.includeArchived || opts.onlyArchived
+    ? await collectMarkdownEntries(storage, join(folderPath, ARCHIVE_SUBDIR), folder, true)
+    : []
 
-  if (!opts.onlyArchived && await storage.exists(folderPath)) {
-    const entries = await storage.listDir(folderPath)
-    for (const entry of entries) {
-      if (!entry.endsWith('.md')) continue
-      matches.push({ path: join(folderPath, entry), folder, entry, archived: false })
-    }
-  }
-
-  if (opts.includeArchived || opts.onlyArchived) {
-    const archivePath = join(folderPath, ARCHIVE_SUBDIR)
-    if (await storage.exists(archivePath)) {
-      const archiveEntries = await storage.listDir(archivePath)
-      for (const entry of archiveEntries) {
-        if (!entry.endsWith('.md')) continue
-        matches.push({ path: join(archivePath, entry), folder, entry, archived: true })
-      }
-    }
-  }
-
-  return matches
+  return [...liveEntries, ...archivedEntries]
 }
 
 export async function findMarkdownFragmentEntry(
@@ -60,19 +75,11 @@ export async function findMarkdownFragmentEntry(
     const folderPath = join(root, folder)
     const entries = await listFolderEntries(folderPath, folder, opts)
     for (const candidate of entries) {
-      const entry = candidate.entry
-
-      let candidateId: string | null = null
-      const visibleType = getTypeForVisibleFolder(folder)
-      if (folder === 'Prose') {
-        candidateId = getProseFragmentIdFromFileName(entry)
-      } else if (visibleType && isVisibleFilenameDerivedType(visibleType)) {
-        candidateId = getFilenameDerivedFragmentId(visibleType, entry)
-      } else if (entry.includes(fragmentId)) {
-        candidateId = fragmentId
-      }
-
-      if (candidateId !== fragmentId) continue
+      const candidateId = getEntryFragmentId(folder, candidate.entry)
+      const isMatch = candidateId
+        ? candidateId === fragmentId
+        : candidate.entry.includes(fragmentId)
+      if (!isMatch) continue
       matches.push(candidate)
     }
   }
