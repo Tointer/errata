@@ -1,9 +1,9 @@
 export {
   getCompiledStoryPath,
-  getInternalStoryRoot,
-  getInternalStoryPath,
-  getMarkdownStoryRoot,
-} from './paths'
+  getStoryInternalDir as getInternalStoryRoot,
+  getStoryInternalPath as getInternalStoryPath,
+  getStoryDir as getMarkdownStoryRoot,
+} from '../storage/story-layout'
 
 export {
   archiveFragmentMarkdown,

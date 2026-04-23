@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest'
 import type { Fragment, StoryMeta } from '@/server/fragments/schema'
 import { createFragment, createStory, getStory, listFragments } from '@/server/fragments/storage'
 import { getProseChain, saveProseChain } from '@/server/fragments/prose-chain'
-import { exportStoryAsZip, importStoryFromZip } from '@/server/story-archive'
+import { exportStoryAsZip, importStoryFromZip } from '@/server/stories/archive'
 import { createTempDir, makeTestSettings } from './setup'
 
 function makeStory(id: string): StoryMeta {

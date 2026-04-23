@@ -2,7 +2,7 @@ import type { Fragment } from '@/server/fragments/schema'
 import { getFrozenSections, type FrozenSection } from '../fragments/protection'
 import { registry } from '../fragments/registry'
 import { normalizeLineEndings, serializeFrontmatter } from './frontmatter'
-import { getFilenameDerivedFragmentId, isVisibleFilenameDerivedType } from './paths'
+import { getFilenameDerivedFragmentId, isVisibleFilenameDerivedType } from './fragment-layout'
 import { splitProseInternalMeta } from './prose-metadata'
 import { resolveFragmentTimestamps, type FragmentInternalRecord } from '../storage/stores/fragment-internals'
 

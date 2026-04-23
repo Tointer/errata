@@ -1,6 +1,6 @@
 import { z } from 'zod/v4'
 import { BlockConfigSchema, type CustomBlockDefinition, type BlockOverride } from '../blocks/schema'
-import { getStoryInternalDir } from '../storage/paths'
+import { getStoryInternalPath } from '../storage/story-layout'
 import { getStorageBackend } from '../storage/runtime'
 
 export const AgentBlockConfigSchema = BlockConfigSchema.extend({
@@ -14,10 +14,14 @@ function emptyConfig(): AgentBlockConfig {
   return { customBlocks: [], overrides: {}, blockOrder: [], disabledTools: [], disableAutoAnalysis: false }
 }
 
+function getAgentBlockConfigPath(dataDir: string, storyId: string, agentName: string): string {
+  return getStoryInternalPath(dataDir, storyId, 'agent-blocks', `${agentName}.json`)
+}
+
 export async function getAgentBlockConfig(dataDir: string, storyId: string, agentName: string): Promise<AgentBlockConfig> {
   const storage = getStorageBackend()
   const config = await storage.readJsonOrDefault(
-    getStoryInternalDir(dataDir, storyId, 'agent-blocks', `${agentName}.json`),
+    getAgentBlockConfigPath(dataDir, storyId, agentName),
     emptyConfig(),
   )
 
@@ -30,7 +34,7 @@ export async function getAgentBlockConfig(dataDir: string, storyId: string, agen
 
 export async function saveAgentBlockConfig(dataDir: string, storyId: string, agentName: string, config: AgentBlockConfig): Promise<void> {
   const storage = getStorageBackend()
-  await storage.writeJson(getStoryInternalDir(dataDir, storyId, 'agent-blocks', `${agentName}.json`), config)
+  await storage.writeJson(getAgentBlockConfigPath(dataDir, storyId, agentName), config)
 }
 
 export async function addAgentCustomBlock(

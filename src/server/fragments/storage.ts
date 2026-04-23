@@ -5,7 +5,7 @@ import { getMarkdownStoryRepository } from '../md-files/markdown-story-repositor
 import {
   getStoriesDir,
   getStoryDir,
-} from '../storage/paths'
+} from '../storage/story-layout'
 import { getStorageBackend } from '../storage/runtime'
 
 const requestLogger = createLogger('fragment-storage')

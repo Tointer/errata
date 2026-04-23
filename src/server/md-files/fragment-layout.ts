@@ -1,11 +1,8 @@
 import { join } from 'node:path'
 import { deriveFragmentIdFromName, usesNameDerivedFragmentId } from '@/lib/fragment-ids'
 import type { Fragment } from '@/server/fragments/schema'
+import { INTERNAL_DIR } from '../storage/story-layout'
 
-export const STORY_META_FILE = '_story.md'
-export const STORY_OUTPUT_FILE = 'story.md'
-export const INTERNAL_DIR = '.errata'
-export const FRAGMENT_INTERNAL_INDEX_FILE = 'fragment-internals.json'
 export const ARCHIVE_SUBDIR = 'Archive'
 
 const VISIBLE_FOLDER_BY_TYPE: Record<string, string> = {
@@ -40,34 +37,6 @@ export const INTERNAL_MARKDOWN_DIRS = [
 ]
 
 export const MARKDOWN_FRAGMENT_DIRS = [...STORY_DIRS, ...INTERNAL_MARKDOWN_DIRS]
-
-function storiesDir(dataDir: string): string {
-  return join(dataDir, 'stories')
-}
-
-export function getMarkdownStoryRoot(dataDir: string, storyId: string): string {
-  return join(storiesDir(dataDir), storyId)
-}
-
-export function getStoryMetaPath(dataDir: string, storyId: string): string {
-  return join(getInternalStoryRoot(dataDir, storyId), STORY_META_FILE)
-}
-
-export function getCompiledStoryPath(dataDir: string, storyId: string): string {
-  return join(getMarkdownStoryRoot(dataDir, storyId), STORY_OUTPUT_FILE)
-}
-
-export function getInternalStoryRoot(dataDir: string, storyId: string): string {
-  return join(getMarkdownStoryRoot(dataDir, storyId), INTERNAL_DIR)
-}
-
-export function getInternalStoryPath(dataDir: string, storyId: string, ...segments: string[]): string {
-  return join(getInternalStoryRoot(dataDir, storyId), ...segments)
-}
-
-export function getFragmentInternalIndexPath(dataDir: string, storyId: string): string {
-  return join(getInternalStoryRoot(dataDir, storyId), FRAGMENT_INTERNAL_INDEX_FILE)
-}
 
 export function getFragmentFolder(type: string): string {
   const visibleFolder = VISIBLE_FOLDER_BY_TYPE[type]

@@ -9,6 +9,7 @@ import keybindsPlugin from '../../plugins/keybinds/entry.server'
 import namesPlugin from '../../plugins/names/entry.server'
 import { join } from 'node:path'
 import { pathToFileURL } from 'node:url'
+import { getInstructionSetsDir } from './storage/global-layout'
 import { getStorageBackend } from './storage/runtime'
 
 type PluginModule = { default: WritingPlugin }
@@ -30,7 +31,7 @@ async function ensureStartupDirectories(dataDir: string, globalDataDir: string, 
   await storage.ensureDir(join(dataDir, '.errata'))
   await storage.ensureDir(join(dataDir, 'stories'))
   await storage.ensureDir(globalDataDir)
-  await storage.ensureDir(join(globalDataDir, 'instruction-sets'))
+  await storage.ensureDir(getInstructionSetsDir(globalDataDir))
 
   if (pluginDir) {
     await storage.ensureDir(pluginDir)

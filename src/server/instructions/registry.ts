@@ -1,5 +1,5 @@
-import { join } from 'node:path'
 import { InstructionSetSchema, type InstructionSet } from './schema'
+import { getInstructionSetsDir } from '../storage/global-layout'
 import { getStorageBackend } from '../storage/runtime'
 
 interface ParsedOverride {
@@ -54,7 +54,7 @@ class InstructionRegistry {
 
   async loadOverrides(dataDir: string): Promise<void> {
     this.overrides = []
-    const dir = join(dataDir, 'instruction-sets')
+    const dir = getInstructionSetsDir(dataDir)
     const storage = getStorageBackend()
     const entries = await storage.listDir(dir)
 
@@ -63,7 +63,7 @@ class InstructionRegistry {
     for (const entry of entries) {
       if (!entry.endsWith('.json')) continue
       try {
-        const raw = await storage.readText(join(dir, entry))
+        const raw = await storage.readText(getInstructionSetsDir(dataDir, ) + '/' + entry)
         const data = JSON.parse(raw)
         const result = InstructionSetSchema.safeParse(data)
         if (!result.success) {

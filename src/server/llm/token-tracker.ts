@@ -7,7 +7,7 @@
  */
 
 import { createLogger } from '../logging'
-import { getInternalStoryPath } from '../md-files/paths'
+import { getStoryInternalPath as getInternalStoryPath } from '../storage/story-layout'
 import { getStorageBackend } from '../storage/runtime'
 import { createDebouncedKeyedBatchQueue } from '../storage/stores/keyed-operations'
 

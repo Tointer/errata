@@ -1,14 +1,24 @@
 import { generateConversationId } from '@/lib/fragment-ids'
 import {
-  getLibrarianAnalysesDir,
-  getLibrarianAnalysisFile,
-  getLibrarianAnalysisIndexFile,
-  getLibrarianChatHistoryFile,
-  getLibrarianConversationHistoryFile,
-  getLibrarianConversationsIndexFile,
-  getLibrarianStateFile,
-} from '../storage/paths'
-import { getStorageBackend } from '../storage/runtime'
+} from './layout'
+import {
+  deleteLibrarianChatHistoryRecord,
+  deleteLibrarianConversationHistoryRecord,
+  deleteLibrarianAnalysisRecord,
+  listLibrarianAnalysisIds,
+  readLibrarianAnalysisIndexRecord,
+  readLibrarianAnalysisRecord,
+  readLibrarianChatHistoryRecord,
+  readLibrarianConversationHistoryRecord,
+  readLibrarianConversationsIndexRecord,
+  readLibrarianStateRecord,
+  writeLibrarianAnalysisIndexRecord,
+  writeLibrarianAnalysisRecord,
+  writeLibrarianChatHistoryRecord,
+  writeLibrarianConversationHistoryRecord,
+  writeLibrarianConversationsIndexRecord,
+  writeLibrarianStateRecord,
+} from './file-store'
 
 // --- Types ---
 
@@ -153,16 +163,14 @@ async function saveAnalysisIndex(
   storyId: string,
   index: LibrarianAnalysisIndex,
 ): Promise<void> {
-  const storage = getStorageBackend()
-  await storage.writeJson(getLibrarianAnalysisIndexFile(dataDir, storyId), index)
+  await writeLibrarianAnalysisIndexRecord(dataDir, storyId, index)
 }
 
 export async function getAnalysisIndex(
   dataDir: string,
   storyId: string,
 ): Promise<LibrarianAnalysisIndex | null> {
-  const storage = getStorageBackend()
-  const parsed = await storage.readJsonIfExists<Partial<LibrarianAnalysisIndex>>(getLibrarianAnalysisIndexFile(dataDir, storyId))
+  const parsed = await readLibrarianAnalysisIndexRecord<Partial<LibrarianAnalysisIndex>>(dataDir, storyId)
   if (!parsed) return null
   return {
     version: 1,
@@ -225,8 +233,7 @@ export async function saveAnalysis(
   storyId: string,
   analysis: LibrarianAnalysis,
 ): Promise<void> {
-  const storage = getStorageBackend()
-  await storage.writeJson(getLibrarianAnalysisFile(dataDir, storyId, analysis.id), analysis)
+  await writeLibrarianAnalysisRecord(dataDir, storyId, analysis.id, analysis)
 
   const currentIndex = await getAnalysisIndex(dataDir, storyId) ?? defaultAnalysisIndex()
   const previous = currentIndex.latestByFragmentId[analysis.fragmentId]
@@ -245,10 +252,8 @@ export async function getAnalysis(
   storyId: string,
   analysisId: string,
 ): Promise<LibrarianAnalysis | null> {
-  const storage = getStorageBackend()
-  const path = getLibrarianAnalysisFile(dataDir, storyId, analysisId)
-  if (!(await storage.exists(path))) return null
-  return normalizeAnalysis(await storage.readJson<Record<string, unknown>>(path))
+  const raw = await readLibrarianAnalysisRecord<Record<string, unknown>>(dataDir, storyId, analysisId)
+  return raw ? normalizeAnalysis(raw) : null
 }
 
 /** Migrate old knowledgeSuggestions → fragmentSuggestions on read */
@@ -268,14 +273,11 @@ export async function deleteAnalysis(
   storyId: string,
   analysisId: string,
 ): Promise<boolean> {
-  const storage = getStorageBackend()
-  const path = getLibrarianAnalysisFile(dataDir, storyId, analysisId)
-  if (!(await storage.exists(path))) return false
+  const raw = await readLibrarianAnalysisRecord<Record<string, unknown>>(dataDir, storyId, analysisId)
+  if (!raw) return false
 
-  // Read the analysis to get fragmentId for index cleanup
-  const analysis = normalizeAnalysis(await storage.readJson<Record<string, unknown>>(path))
-
-  await storage.delete(path)
+  const analysis = normalizeAnalysis(raw)
+  await deleteLibrarianAnalysisRecord(dataDir, storyId, analysisId)
 
   // Clean up index entry if it points to this analysis
   const index = await getAnalysisIndex(dataDir, storyId)
@@ -295,18 +297,12 @@ export async function listAnalyses(
   dataDir: string,
   storyId: string,
 ): Promise<LibrarianAnalysisSummary[]> {
-  const storage = getStorageBackend()
-  const dir = getLibrarianAnalysesDir(dataDir, storyId)
-  if (!(await storage.exists(dir))) return []
-
-  const entries = await storage.listDir(dir)
   const summaries: LibrarianAnalysisSummary[] = []
 
-  for (const entry of entries) {
-    if (!entry.endsWith('.json')) continue
-    const analysis = normalizeAnalysis(await storage.readJson<Record<string, unknown>>(
-      getLibrarianAnalysisFile(dataDir, storyId, entry.replace(/\.json$/, '')),
-    ))
+  for (const analysisId of await listLibrarianAnalysisIds(dataDir, storyId)) {
+    const raw = await readLibrarianAnalysisRecord<Record<string, unknown>>(dataDir, storyId, analysisId)
+    if (!raw) continue
+    const analysis = normalizeAnalysis(raw)
     summaries.push({
       id: analysis.id,
       createdAt: analysis.createdAt,
@@ -329,8 +325,7 @@ export async function getState(
   dataDir: string,
   storyId: string,
 ): Promise<LibrarianState> {
-  const storage = getStorageBackend()
-  return storage.readJsonOrDefault(getLibrarianStateFile(dataDir, storyId), {
+  return readLibrarianStateRecord(dataDir, storyId, {
     lastAnalyzedFragmentId: null,
     summarizedUpTo: null,
     recentMentions: {},
@@ -343,8 +338,7 @@ export async function saveState(
   storyId: string,
   state: LibrarianState,
 ): Promise<void> {
-  const storage = getStorageBackend()
-  await storage.writeJson(getLibrarianStateFile(dataDir, storyId), state)
+  await writeLibrarianStateRecord(dataDir, storyId, state)
 }
 
 // --- Chat history ---
@@ -364,8 +358,7 @@ export async function getChatHistory(
   dataDir: string,
   storyId: string,
 ): Promise<ChatHistory> {
-  const storage = getStorageBackend()
-  return storage.readJsonOrDefault(getLibrarianChatHistoryFile(dataDir, storyId), {
+  return readLibrarianChatHistoryRecord(dataDir, storyId, {
     messages: [],
     updatedAt: new Date().toISOString(),
   })
@@ -376,20 +369,18 @@ export async function saveChatHistory(
   storyId: string,
   messages: ChatHistoryMessage[],
 ): Promise<void> {
-  const storage = getStorageBackend()
   const history: ChatHistory = {
     messages,
     updatedAt: new Date().toISOString(),
   }
-  await storage.writeJson(getLibrarianChatHistoryFile(dataDir, storyId), history)
+  await writeLibrarianChatHistoryRecord(dataDir, storyId, history)
 }
 
 export async function clearChatHistory(
   dataDir: string,
   storyId: string,
 ): Promise<void> {
-  const storage = getStorageBackend()
-  await storage.deleteIfExists(getLibrarianChatHistoryFile(dataDir, storyId))
+  await deleteLibrarianChatHistoryRecord(dataDir, storyId)
 }
 
 // --- Conversations ---
@@ -405,22 +396,17 @@ interface ConversationsIndex {
   conversations: ConversationMeta[]
 }
 
-function conversationHistoryPath(dataDir: string, storyId: string, conversationId: string): string {
-  return getLibrarianConversationHistoryFile(dataDir, storyId, conversationId)
-}
-
 async function readConversationsIndex(dataDir: string, storyId: string): Promise<ConversationsIndex> {
-  const storage = getStorageBackend()
-  const parsed = await storage.readJsonOrDefault<Partial<ConversationsIndex>>(
-    getLibrarianConversationsIndexFile(dataDir, storyId),
+  const parsed = await readLibrarianConversationsIndexRecord<Partial<ConversationsIndex>>(
+    dataDir,
+    storyId,
     { conversations: [] },
   )
   return { conversations: parsed.conversations ?? [] }
 }
 
 async function writeConversationsIndex(dataDir: string, storyId: string, index: ConversationsIndex): Promise<void> {
-  const storage = getStorageBackend()
-  await storage.writeJson(getLibrarianConversationsIndexFile(dataDir, storyId), index)
+  await writeLibrarianConversationsIndexRecord(dataDir, storyId, index)
 }
 
 export async function listConversations(dataDir: string, storyId: string): Promise<ConversationMeta[]> {
@@ -459,15 +445,12 @@ export async function updateConversationTitle(
 }
 
 export async function deleteConversation(dataDir: string, storyId: string, conversationId: string): Promise<boolean> {
-  const storage = getStorageBackend()
   const index = await readConversationsIndex(dataDir, storyId)
   const idx = index.conversations.findIndex(c => c.id === conversationId)
   if (idx === -1) return false
   index.conversations.splice(idx, 1)
   await writeConversationsIndex(dataDir, storyId, index)
-  // Delete history file
-  const historyFile = conversationHistoryPath(dataDir, storyId, conversationId)
-  await storage.deleteIfExists(historyFile)
+  await deleteLibrarianConversationHistoryRecord(dataDir, storyId, conversationId)
   return true
 }
 
@@ -476,8 +459,7 @@ export async function getConversationHistory(
   storyId: string,
   conversationId: string,
 ): Promise<ChatHistory> {
-  const storage = getStorageBackend()
-  return storage.readJsonOrDefault(conversationHistoryPath(dataDir, storyId, conversationId), {
+  return readLibrarianConversationHistoryRecord(dataDir, storyId, conversationId, {
     messages: [],
     updatedAt: new Date().toISOString(),
   })
@@ -489,9 +471,8 @@ export async function saveConversationHistory(
   conversationId: string,
   messages: ChatHistoryMessage[],
 ): Promise<void> {
-  const storage = getStorageBackend()
   const history: ChatHistory = { messages, updatedAt: new Date().toISOString() }
-  await storage.writeJson(conversationHistoryPath(dataDir, storyId, conversationId), history)
+  await writeLibrarianConversationHistoryRecord(dataDir, storyId, conversationId, history)
   // Update conversation timestamp
   const index = await readConversationsIndex(dataDir, storyId)
   const conv = index.conversations.find(c => c.id === conversationId)

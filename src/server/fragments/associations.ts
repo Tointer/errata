@@ -1,10 +1,14 @@
 import { AssociationsSchema, type Associations } from './schema'
 import { getFragment, updateFragment } from './storage'
 import { createLogger } from '../logging/logger'
-import { getAssociationsFile } from '../storage/paths'
+import { getStoryInternalPath } from '../storage/story-layout'
 import { getStorageBackend } from '../storage/runtime'
 
 const log = createLogger('tags')
+
+function getAssociationsPath(dataDir: string, storyId: string): string {
+  return getStoryInternalPath(dataDir, storyId, 'associations.json')
+}
 
 export async function getAssociations(
   dataDir: string,
@@ -12,7 +16,7 @@ export async function getAssociations(
 ): Promise<Associations> {
   const storage = getStorageBackend()
   const assoc = await storage.readJsonOrDefault<Associations>(
-    getAssociationsFile(dataDir, storyId),
+    getAssociationsPath(dataDir, storyId),
     { tagIndex: {}, refIndex: {} },
   )
   return AssociationsSchema.parse(assoc)
@@ -24,7 +28,7 @@ export async function saveAssociations(
   assoc: Associations
 ): Promise<void> {
   const storage = getStorageBackend()
-  await storage.writeJson(getAssociationsFile(dataDir, storyId), assoc)
+  await storage.writeJson(getAssociationsPath(dataDir, storyId), assoc)
 }
 
 // --- Tag operations ---

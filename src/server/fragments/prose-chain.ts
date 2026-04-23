@@ -1,9 +1,13 @@
 import type { ProseChain } from './schema'
-import { getProseChainFile } from '../storage/paths'
+import { getStoryInternalPath } from '../storage/story-layout'
 import { getStorageBackend } from '../storage/runtime'
 import { getMarkdownStoryRepository } from '../md-files/markdown-story-repository'
 
 const PROSE_CHAIN_FILE = 'prose-chain.json'
+
+function getProseChainPath(dataDir: string, storyId: string): string {
+  return getStoryInternalPath(dataDir, storyId, PROSE_CHAIN_FILE)
+}
 
 /**
  * Get the prose chain for a story.
@@ -14,8 +18,7 @@ export async function getProseChain(
   storyId: string,
 ): Promise<ProseChain | null> {
   const storage = getStorageBackend()
-  void PROSE_CHAIN_FILE
-  return storage.readJsonOrDefault<ProseChain | null>(getProseChainFile(dataDir, storyId), null)
+  return storage.readJsonOrDefault<ProseChain | null>(getProseChainPath(dataDir, storyId), null)
 }
 
 /**
@@ -28,7 +31,7 @@ export async function saveProseChain(
 ): Promise<void> {
   const storage = getStorageBackend()
   const markdownRepository = getMarkdownStoryRepository()
-  await storage.writeJson(getProseChainFile(dataDir, storyId), chain)
+  await storage.writeJson(getProseChainPath(dataDir, storyId), chain)
   await markdownRepository.syncProseOrder(dataDir, storyId)
   await markdownRepository.syncCompiledStory(dataDir, storyId)
 }

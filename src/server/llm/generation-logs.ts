@@ -1,5 +1,5 @@
 import { join } from 'node:path'
-import { getStoryInternalDir } from '../storage/paths'
+import { getStoryInternalPath } from '../storage/story-layout'
 import { getStorageBackend } from '../storage/runtime'
 
 export interface ToolCallLog {
@@ -50,7 +50,7 @@ export interface GenerationLogSummary {
 }
 
 async function logsDir(dataDir: string, storyId: string): Promise<string> {
-  return getStoryInternalDir(dataDir, storyId, 'generation-logs')
+  return getStoryInternalPath(dataDir, storyId, 'generation-logs')
 }
 
 async function logPath(dataDir: string, storyId: string, logId: string): Promise<string> {

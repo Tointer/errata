@@ -1,6 +1,7 @@
 import { join } from 'node:path'
-import { findMarkdownFragmentEntry } from './markdown-fragment-entries.ts'
-import { ARCHIVE_SUBDIR, getMarkdownStoryRoot } from './paths'
+import { findMarkdownFragmentEntry } from './fragment-locator'
+import { ARCHIVE_SUBDIR } from './fragment-layout'
+import { getStoryDir as getMarkdownStoryRoot } from '../storage/story-layout'
 import { getStorageBackend } from '../storage/runtime'
 
 export async function writeMarkdownFragmentFile(

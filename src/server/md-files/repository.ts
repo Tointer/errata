@@ -2,21 +2,23 @@ import { join } from 'node:path'
 import type { Fragment, ProseChain, StoryMeta } from '@/server/fragments/schema'
 import { getProseChain } from '../fragments/prose-chain'
 import {
-  getFilenameDerivedFragmentId,
   getCompiledStoryPath,
+  getStoryDir as getMarkdownStoryRoot,
+  getStoryInternalDir as getInternalStoryRoot,
+  getStoryMetaPath,
+} from '../storage/story-layout'
+import {
+  getFilenameDerivedFragmentId,
   getFragmentFileName,
   getFragmentFolder,
-  getInternalStoryRoot,
+  getProseFragmentIdFromFileName,
+  getTypeForVisibleFolder,
   INTERNAL_MARKDOWN_DIRS,
   isVisibleFilenameDerivedType,
-  getMarkdownStoryRoot,
   MARKDOWN_FRAGMENT_DIRS,
-  getProseFragmentIdFromFileName,
-  getStoryMetaPath,
   STORY_DIRS,
-  getTypeForVisibleFolder,
-} from './paths'
-import { findMarkdownFragmentEntry, listFolderEntries, type MarkdownFragmentEntry } from './markdown-fragment-entries.ts'
+} from './fragment-layout'
+import { findMarkdownFragmentEntry, listFolderEntries, type MarkdownFragmentEntry } from './fragment-locator'
 import {
   archiveMarkdownFragmentFile,
   deleteMarkdownFragmentFiles,

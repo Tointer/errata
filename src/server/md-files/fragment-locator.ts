@@ -1,13 +1,13 @@
 import { join } from 'node:path'
 import {
   ARCHIVE_SUBDIR,
+  MARKDOWN_FRAGMENT_DIRS,
   getFilenameDerivedFragmentId,
-  getMarkdownStoryRoot,
   getProseFragmentIdFromFileName,
   getTypeForVisibleFolder,
   isVisibleFilenameDerivedType,
-  MARKDOWN_FRAGMENT_DIRS,
-} from './paths'
+} from './fragment-layout'
+import { getStoryDir as getMarkdownStoryRoot } from '../storage/story-layout'
 import type { StorageBackend } from '../storage/backend'
 import { getStorageBackend } from '../storage/runtime'
 
@@ -35,7 +35,7 @@ async function collectMarkdownEntries(
     .map((entry) => ({ path: join(folderPath, entry), folder, entry, archived }))
 }
 
-function getEntryFragmentId(folder: string, entry: string): string | null {
+export function getEntryFragmentId(folder: string, entry: string): string | null {
   if (folder === 'Prose') return getProseFragmentIdFromFileName(entry)
 
   const visibleType = getTypeForVisibleFolder(folder)

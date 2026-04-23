@@ -1,20 +1,12 @@
-import { join } from 'node:path'
 import { GlobalConfigSchema, type GlobalConfig, type ProviderConfig } from './schema'
+import { getGlobalConfigPath } from '../storage/global-layout'
 import { getStorageBackend } from '../storage/runtime'
-
-function resolveConfigDataDir(dataDir: string): string {
-  return process.env.GLOBAL_DATA_DIR?.trim() || dataDir
-}
-
-function configPath(dataDir: string): string {
-  return join(resolveConfigDataDir(dataDir), 'config.json')
-}
 
 export async function getGlobalConfig(dataDir: string): Promise<GlobalConfig> {
   const storage = getStorageBackend()
   try {
     return GlobalConfigSchema.parse(
-      await storage.readJsonOrDefault(configPath(dataDir), { providers: [], defaultProviderId: null }),
+      await storage.readJsonOrDefault(getGlobalConfigPath(dataDir), { providers: [], defaultProviderId: null }),
     )
   } catch {
     return { providers: [], defaultProviderId: null }
@@ -23,7 +15,7 @@ export async function getGlobalConfig(dataDir: string): Promise<GlobalConfig> {
 
 export async function saveGlobalConfig(dataDir: string, config: GlobalConfig): Promise<void> {
   const storage = getStorageBackend()
-  await storage.writeJson(configPath(dataDir), config)
+  await storage.writeJson(getGlobalConfigPath(dataDir), config)
 }
 
 export async function addProvider(dataDir: string, provider: ProviderConfig): Promise<GlobalConfig> {

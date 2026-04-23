@@ -1,5 +1,5 @@
 import type { Fragment } from '@/server/fragments/schema'
-import { getFragmentInternalIndexPath } from '../../md-files/paths'
+import { getFragmentInternalIndexPath } from '../story-layout'
 import { buildProseInternalFields, type ProseFragmentInternalFields } from '../../md-files/prose-metadata'
 import { createLogger } from '../../logging/logger'
 import { getStorageBackend } from '../runtime'

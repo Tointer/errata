@@ -1,5 +1,9 @@
-import { getCharacterChatConversationFile, getCharacterChatConversationsDir } from '../storage/paths'
-import { getStorageBackend } from '../storage/runtime'
+import {
+  deleteCharacterChatConversationRecord,
+  listCharacterChatConversationIds,
+  readCharacterChatConversationRecord,
+  writeCharacterChatConversationRecord,
+} from './file-store'
 
 // --- Types ---
 
@@ -52,8 +56,7 @@ export async function saveConversation(
   storyId: string,
   conversation: CharacterChatConversation,
 ): Promise<void> {
-  const storage = getStorageBackend()
-  await storage.writeJson(getCharacterChatConversationFile(dataDir, storyId, conversation.id), conversation)
+  await writeCharacterChatConversationRecord(dataDir, storyId, conversation.id, conversation)
 }
 
 export async function getConversation(
@@ -61,8 +64,7 @@ export async function getConversation(
   storyId: string,
   conversationId: string,
 ): Promise<CharacterChatConversation | null> {
-  const storage = getStorageBackend()
-  return storage.readJsonIfExists(getCharacterChatConversationFile(dataDir, storyId, conversationId))
+  return readCharacterChatConversationRecord(dataDir, storyId, conversationId)
 }
 
 export async function listConversations(
@@ -70,15 +72,11 @@ export async function listConversations(
   storyId: string,
   characterId?: string,
 ): Promise<CharacterChatConversationSummary[]> {
-  const storage = getStorageBackend()
-  const entries = await storage.listDir(getCharacterChatConversationsDir(dataDir, storyId))
   const summaries: CharacterChatConversationSummary[] = []
 
-  for (const entry of entries) {
-    if (!entry.endsWith('.json')) continue
-    const conv = await storage.readJson<CharacterChatConversation>(
-      getCharacterChatConversationFile(dataDir, storyId, entry.replace(/\.json$/, '')),
-    )
+  for (const conversationId of await listCharacterChatConversationIds(dataDir, storyId)) {
+    const conv = await readCharacterChatConversationRecord<CharacterChatConversation>(dataDir, storyId, conversationId)
+    if (!conv) continue
 
     if (characterId && conv.characterId !== characterId) continue
 
@@ -104,9 +102,5 @@ export async function deleteConversation(
   storyId: string,
   conversationId: string,
 ): Promise<boolean> {
-  const storage = getStorageBackend()
-  const path = getCharacterChatConversationFile(dataDir, storyId, conversationId)
-  if (!(await storage.exists(path))) return false
-  await storage.delete(path)
-  return true
+  return deleteCharacterChatConversationRecord(dataDir, storyId, conversationId)
 }

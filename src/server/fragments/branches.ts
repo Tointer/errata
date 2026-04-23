@@ -1,7 +1,7 @@
 import { join } from 'node:path'
 import type { BranchesIndex, BranchMeta } from './schema'
 import { getStorageBackend } from '../storage/runtime'
-import { getStoryDir } from '../storage/paths'
+import { getStoryDir } from '../storage/story-layout'
 
 function storyDir(dataDir: string, storyId: string): string {
   return getStoryDir(dataDir, storyId)

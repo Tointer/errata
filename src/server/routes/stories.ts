@@ -6,7 +6,7 @@ import {
   updateStory,
   deleteStory,
 } from '../fragments/storage'
-import { exportStoryAsZip, importStoryFromZip } from '../story-archive'
+import { exportStoryAsZip, importStoryFromZip } from '../stories/archive'
 import type { StoryMeta } from '../fragments/schema'
 
 export function storyRoutes(dataDir: string) {
