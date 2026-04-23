@@ -1,18 +1,5 @@
 import type { Fragment, StoryMeta } from '@/server/fragments/schema'
-import {
-  archiveFragmentMarkdown,
-  deleteFragmentMarkdown,
-  isMarkdownFragmentArchived,
-  listArchivedMarkdownFragments,
-  listMarkdownFragments,
-  loadMarkdownFragmentById,
-  loadMarkdownStoryMeta,
-  restoreFragmentMarkdown,
-  syncCompiledStoryFromCurrentChain,
-  syncFragmentMarkdown,
-  syncProseMarkdownOrder,
-  syncStoryMarkdownMeta,
-} from './repository'
+import * as repository from './repository'
 
 export interface MarkdownStoryRepository {
   archiveFragment(dataDir: string, storyId: string, fragmentId: string): Promise<boolean>
@@ -29,20 +16,20 @@ export interface MarkdownStoryRepository {
   syncStory(dataDir: string, story: StoryMeta): Promise<void>
 }
 
-const defaultMarkdownStoryRepository: MarkdownStoryRepository = {
-  archiveFragment: archiveFragmentMarkdown,
-  deleteFragment: deleteFragmentMarkdown,
-  isFragmentArchived: isMarkdownFragmentArchived,
-  listArchivedFragments: listArchivedMarkdownFragments,
-  listFragments: listMarkdownFragments,
-  loadFragment: loadMarkdownFragmentById,
-  loadStory: loadMarkdownStoryMeta,
-  restoreFragment: restoreFragmentMarkdown,
-  syncCompiledStory: syncCompiledStoryFromCurrentChain,
-  syncFragment: syncFragmentMarkdown,
-  syncProseOrder: syncProseMarkdownOrder,
-  syncStory: syncStoryMarkdownMeta,
-}
+const defaultMarkdownStoryRepository = {
+  archiveFragment: repository.archiveFragmentMarkdown,
+  deleteFragment: repository.deleteFragmentMarkdown,
+  isFragmentArchived: repository.isMarkdownFragmentArchived,
+  listArchivedFragments: repository.listArchivedMarkdownFragments,
+  listFragments: repository.listMarkdownFragments,
+  loadFragment: repository.loadMarkdownFragmentById,
+  loadStory: repository.loadMarkdownStoryMeta,
+  restoreFragment: repository.restoreFragmentMarkdown,
+  syncCompiledStory: repository.syncCompiledStoryFromCurrentChain,
+  syncFragment: repository.syncFragmentMarkdown,
+  syncProseOrder: repository.syncProseMarkdownOrder,
+  syncStory: repository.syncStoryMarkdownMeta,
+} satisfies MarkdownStoryRepository
 
 let markdownStoryRepository: MarkdownStoryRepository = defaultMarkdownStoryRepository
 
