@@ -65,7 +65,7 @@ function createMockStreamResult(text: string) {
 describe('plugin integration', () => {
   let dataDir: string
   let cleanup: () => Promise<void>
-  let app: ReturnType<typeof createApp>
+  let app: Awaited<ReturnType<typeof createApp>>
   const storyId = 'story-test'
 
   async function api(path: string, init?: RequestInit) {
@@ -80,7 +80,7 @@ describe('plugin integration', () => {
     dataDir = tmp.path
     cleanup = tmp.cleanup
     await seedTestProvider(dataDir)
-    app = createApp(dataDir)
+    app = await createApp(dataDir)
     mockAgentInstances.length = 0
     mockAgentCtor.mockClear()
     mockAgentStream.mockClear()

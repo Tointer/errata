@@ -1,27 +1,25 @@
-import { readFile } from 'node:fs/promises'
-import { existsSync } from 'node:fs'
 import { AssociationsSchema, type Associations } from './schema'
 import { getFragment, updateFragment } from './storage'
 import { createLogger } from '../logging/logger'
-import { getInternalStoryPath } from '../md-files/paths'
-import { writeJsonAtomic } from '../fs-utils'
+import { getStoryInternalPath } from '../storage/story-layout'
+import { getStorageBackend } from '../storage/runtime'
 
 const log = createLogger('tags')
 
-async function associationsPath(dataDir: string, storyId: string): Promise<string> {
-  return getInternalStoryPath(dataDir, storyId, 'associations.json')
+function getAssociationsPath(dataDir: string, storyId: string): string {
+  return getStoryInternalPath(dataDir, storyId, 'associations.json')
 }
 
 export async function getAssociations(
   dataDir: string,
   storyId: string
 ): Promise<Associations> {
-  const path = await associationsPath(dataDir, storyId)
-  if (!existsSync(path)) {
-    return { tagIndex: {}, refIndex: {} }
-  }
-  const raw = await readFile(path, 'utf-8')
-  return AssociationsSchema.parse(JSON.parse(raw))
+  const storage = getStorageBackend()
+  const assoc = await storage.readJsonOrDefault<Associations>(
+    getAssociationsPath(dataDir, storyId),
+    { tagIndex: {}, refIndex: {} },
+  )
+  return AssociationsSchema.parse(assoc)
 }
 
 export async function saveAssociations(
@@ -29,8 +27,8 @@ export async function saveAssociations(
   storyId: string,
   assoc: Associations
 ): Promise<void> {
-  const path = await associationsPath(dataDir, storyId)
-  await writeJsonAtomic(path, assoc)
+  const storage = getStorageBackend()
+  await storage.writeJson(getAssociationsPath(dataDir, storyId), assoc)
 }
 
 // --- Tag operations ---

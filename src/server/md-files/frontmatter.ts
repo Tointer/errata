@@ -1,5 +1,9 @@
+export function normalizeLineEndings(text: string): string {
+  return text.replace(/\r\n/g, '\n')
+}
+
 export function serializeFrontmatter(attributes: Record<string, unknown>, body: string): string {
-  const normalizedBody = body.replace(/\r\n/g, '\n')
+  const normalizedBody = normalizeLineEndings(body)
   const lines = Object.entries(attributes)
     .filter(([, value]) => value !== undefined)
     .map(([key, value]) => `${key}: ${JSON.stringify(value)}`)
@@ -9,7 +13,7 @@ export function serializeFrontmatter(attributes: Record<string, unknown>, body: 
 }
 
 export function parseFrontmatter(raw: string): { attributes: Record<string, unknown>; body: string } {
-  const normalized = raw.replace(/\r\n/g, '\n')
+  const normalized = normalizeLineEndings(raw)
   if (!normalized.startsWith('---\n')) {
     return { attributes: {}, body: normalized }
   }

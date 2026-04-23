@@ -7,10 +7,10 @@ import colorPickerPlugin from '../../plugins/color-picker/entry.server'
 import dicerollPlugin from '../../plugins/diceroll/entry.server'
 import keybindsPlugin from '../../plugins/keybinds/entry.server'
 import namesPlugin from '../../plugins/names/entry.server'
-import { existsSync } from 'node:fs'
-import { mkdir, readdir } from 'node:fs/promises'
 import { join } from 'node:path'
 import { pathToFileURL } from 'node:url'
+import { getInstructionSetsDir } from './storage/global-layout'
+import { getStorageBackend } from './storage/runtime'
 
 type PluginModule = { default: WritingPlugin }
 
@@ -26,14 +26,15 @@ const fallbackBundledPluginModules: Record<string, PluginModule> = {
 }
 
 async function ensureStartupDirectories(dataDir: string, globalDataDir: string, pluginDir?: string) {
-  await mkdir(dataDir, { recursive: true })
-  await mkdir(join(dataDir, '.errata'), { recursive: true })
-  await mkdir(join(dataDir, 'stories'), { recursive: true })
-  await mkdir(globalDataDir, { recursive: true })
-  await mkdir(join(globalDataDir, 'instruction-sets'), { recursive: true })
+  const storage = getStorageBackend()
+  await storage.ensureDir(dataDir)
+  await storage.ensureDir(join(dataDir, '.errata'))
+  await storage.ensureDir(join(dataDir, 'stories'))
+  await storage.ensureDir(globalDataDir)
+  await storage.ensureDir(getInstructionSetsDir(globalDataDir))
 
   if (pluginDir) {
-    await mkdir(pluginDir, { recursive: true })
+    await storage.ensureDir(pluginDir)
   }
 }
 
@@ -55,16 +56,17 @@ function getBundledPluginModules(): Record<string, PluginModule> | null {
 const pluginModules = getBundledPluginModules()
 
 async function loadBundledPluginsFromFilesystem(): Promise<Array<[string, PluginModule]>> {
+  const storage = getStorageBackend()
   const pluginsDir = join(resolveAppRoot(), 'plugins')
-  if (!existsSync(pluginsDir)) {
+  if (!(await storage.exists(pluginsDir))) {
     return []
   }
 
-  const entries = await readdir(pluginsDir, { withFileTypes: true })
+  const entries = await storage.listDirDetailed(pluginsDir)
   const modules: Array<[string, PluginModule]> = []
 
   for (const entry of entries) {
-    if (!entry.isDirectory()) continue
+    if (!entry.isDirectory) continue
 
     const pluginPath = join(pluginsDir, entry.name, 'entry.server.ts')
     try {
@@ -168,7 +170,7 @@ export async function initializeApp() {
   return createApp(dataDir, globalDataDir)
 }
 
-let appPromise: Promise<ReturnType<typeof createApp>> | null = null
+let appPromise: Promise<Awaited<ReturnType<typeof createApp>>> | null = null
 
 export function getApp() {
   if (!appPromise) {

@@ -218,7 +218,7 @@ describe('prewriter', () => {
   describe('generation route with prewriter', () => {
     let dataDir: string
     let cleanup: () => Promise<void>
-    let app: ReturnType<typeof createApp>
+    let app: Awaited<ReturnType<typeof createApp>>
     const storyId = 'story-test'
 
     async function apiCall(path: string, init?: RequestInit) {
@@ -233,7 +233,7 @@ describe('prewriter', () => {
       dataDir = tmp.path
       cleanup = tmp.cleanup
       await seedTestProvider(dataDir)
-      app = createApp(dataDir)
+      app = await createApp(dataDir)
       vi.clearAllMocks()
     })
 

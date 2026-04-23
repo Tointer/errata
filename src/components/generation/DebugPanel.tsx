@@ -374,7 +374,7 @@ function ToolsTab({ log }: { log: GenerationLog }) {
                 {argEntries.slice(0, 3).map(([key, val]) => (
                   <span
                     key={key}
-                    className="text-[0.5625rem] font-mono text-muted-foreground bg-muted/20 rounded px-1 py-px truncate max-w-[140px] shrink-0"
+                    className="text-[0.5625rem] font-mono text-muted-foreground bg-muted/20 rounded px-1 py-px truncate max-w-35 shrink-0"
                   >
                     <span className="text-muted-foreground">{key}=</span>
                     {formatArgValue(val)}
@@ -439,7 +439,7 @@ function ToolsTab({ log }: { log: GenerationLog }) {
                         const isLong = valStr.length > 80
                         return (
                           <div key={key} className="flex gap-2 text-[0.6875rem] font-mono leading-relaxed">
-                            <span className="text-muted-foreground shrink-0 select-none w-[100px] text-right truncate" title={key}>
+                            <span className="text-muted-foreground shrink-0 select-none w-25 text-right truncate" title={key}>
                               {key}
                             </span>
                             <span className="text-muted-foreground break-all">
@@ -467,7 +467,7 @@ function ToolsTab({ log }: { log: GenerationLog }) {
                     </span>
                     <CopyButton text={resultStr} className="ml-auto" />
                   </div>
-                  <pre className="whitespace-pre-wrap text-[0.6875rem] font-mono text-muted-foreground max-h-[300px] overflow-y-auto leading-relaxed">
+                  <pre className="whitespace-pre-wrap text-[0.6875rem] font-mono text-muted-foreground max-h-75 overflow-y-auto leading-relaxed">
                     {resultStr}
                   </pre>
                 </div>
@@ -491,7 +491,7 @@ function OutputTab({ log }: { log: GenerationLog }) {
         <div className="rounded-lg border border-primary/15 overflow-hidden">
           <button
             onClick={() => setPrewriterReasoningExpanded(!prewriterReasoningExpanded)}
-            className="w-full flex items-center gap-2 px-3 py-1.5 bg-primary/[0.03] border-b border-primary/10 hover:bg-primary/[0.06] transition-colors"
+            className="w-full flex items-center gap-2 px-3 py-1.5 bg-primary/3 border-b border-primary/10 hover:bg-primary/6 transition-colors"
           >
             {prewriterReasoningExpanded ? <ChevronDown className="size-3 text-primary/50" /> : <ChevronRight className="size-3 text-primary/50" />}
             <Brain className="size-3 text-primary/50" />
@@ -503,7 +503,7 @@ function OutputTab({ log }: { log: GenerationLog }) {
             </span>
           </button>
           {prewriterReasoningExpanded && (
-            <div className="p-3 max-h-[300px] overflow-y-auto">
+            <div className="p-3 max-h-75 overflow-y-auto">
               <pre className="whitespace-pre-wrap text-[0.6875rem] font-mono text-muted-foreground italic leading-relaxed">
                 {log.prewriterReasoning}
               </pre>
@@ -516,7 +516,7 @@ function OutputTab({ log }: { log: GenerationLog }) {
         <div className="rounded-lg border border-primary/15 overflow-hidden">
           <button
             onClick={() => setPrewriterExpanded(!prewriterExpanded)}
-            className="w-full flex items-center gap-2 px-3 py-1.5 bg-primary/[0.03] border-b border-primary/10 hover:bg-primary/[0.06] transition-colors"
+            className="w-full flex items-center gap-2 px-3 py-1.5 bg-primary/3 border-b border-primary/10 hover:bg-primary/6 transition-colors"
           >
             {prewriterExpanded ? <ChevronDown className="size-3 text-primary/50" /> : <ChevronRight className="size-3 text-primary/50" />}
             <FileText className="size-3 text-primary/50" />
@@ -541,7 +541,7 @@ function OutputTab({ log }: { log: GenerationLog }) {
             </span>
           </button>
           {prewriterExpanded && (
-            <div className="p-3 max-h-[400px] overflow-y-auto">
+            <div className="p-3 max-h-100 overflow-y-auto">
               <div className="flex justify-end mb-1.5">
                 <CopyButton text={log.prewriterBrief} />
               </div>
@@ -569,7 +569,7 @@ function OutputTab({ log }: { log: GenerationLog }) {
             </span>
           </button>
           {reasoningExpanded && (
-            <div className="p-3 max-h-[300px] overflow-y-auto">
+            <div className="p-3 max-h-75 overflow-y-auto">
               <pre className="whitespace-pre-wrap text-[0.6875rem] font-mono text-muted-foreground italic leading-relaxed">
                 {log.reasoning}
               </pre>
@@ -590,7 +590,7 @@ function OutputTab({ log }: { log: GenerationLog }) {
         </div>
 
         {/* Content */}
-        <div className="p-3 max-h-[500px] overflow-y-auto">
+        <div className="p-3 max-h-125 overflow-y-auto">
           <div className="text-[0.6875rem] text-muted-foreground leading-relaxed prose prose-sm prose-muted max-w-none [&_p]:text-[0.6875rem] [&_p]:text-muted-foreground [&_p]:leading-relaxed">
             <StreamMarkdown content={log.generatedText} />
           </div>

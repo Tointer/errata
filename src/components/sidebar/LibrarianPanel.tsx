@@ -436,11 +436,11 @@ function StoryContent({ storyId, status, onOpenChat }: LibrarianPanelProps & { s
             <SectionLabel icon={<Clock className="size-3" />}>Timeline</SectionLabel>
             <div className="mt-1.5 relative">
               {/* Vertical thread line */}
-              <div className="absolute left-[5px] top-2 bottom-2 w-px bg-border/40" />
+              <div className="absolute left-1.25 top-2 bottom-2 w-px bg-border/40" />
               <div className="space-y-0">
                 {status.timeline.slice(-10).map((entry, i) => (
                   <div key={`${entry.fragmentId}-${entry.event}-${i}`} className="flex items-start gap-2.5 py-1 pl-0 relative">
-                    <span className="relative z-10 mt-[5px] size-[7px] rounded-full bg-muted-foreground/20 ring-2 ring-background shrink-0" />
+                    <span className="relative z-10 mt-1.25 size-1.75 rounded-full bg-muted-foreground/20 ring-2 ring-background shrink-0" />
                     <div className="min-w-0">
                       <span className="text-[0.6875rem] text-foreground/65 leading-snug block">{entry.event}</span>
                       <span className="text-[0.5625rem] font-mono text-muted-foreground">{entry.fragmentId}</span>
@@ -656,7 +656,7 @@ function AnalysisItem({
               <Textarea
                 value={summaryDraft}
                 onChange={(e) => setSummaryDraft(e.target.value)}
-                className="mt-1.5 min-h-[88px] resize-y bg-background/50 text-[0.6875rem] leading-relaxed"
+                className="mt-1.5 min-h-22 resize-y bg-background/50 text-[0.6875rem] leading-relaxed"
                 placeholder="Summary update..."
               />
             ) : analysis.summaryUpdate ? (
@@ -943,7 +943,7 @@ function TraceItem({ item }: { item: CollapsedTraceItem }) {
         </button>
         {expanded && (
           <div className="border-t border-border/10 px-2 py-1.5">
-            <p className="text-[0.625rem] text-muted-foreground leading-relaxed whitespace-pre-wrap break-words">
+            <p className="text-[0.625rem] text-muted-foreground leading-relaxed whitespace-pre-wrap wrap-break-word">
               {item.text}
             </p>
           </div>
@@ -1350,7 +1350,7 @@ function FullscreenSummaryEditor({
         <span className="font-display italic">
           Press <kbd className="font-mono text-[0.625rem] px-1 py-0.5 rounded bg-muted/50 not-italic">Esc</kbd> to close · edits autosave on blur
         </span>
-        <span className="font-display italic min-w-[6rem] text-right">
+        <span className="font-display italic min-w-24 text-right">
           {saveState === 'saving' && (
             <span className="inline-flex items-center gap-1.5">
               <span aria-hidden className="inline-block size-1 rounded-full bg-primary/50 animate-wisp-breathe" />

@@ -106,13 +106,13 @@ function createMockEventStreamResult(events: Array<Record<string, unknown>>, tex
 describe('librarian refine endpoint', () => {
   let dataDir: string
   let cleanup: () => Promise<void>
-  let app: ReturnType<typeof createApp>
+  let app: Awaited<ReturnType<typeof createApp>>
 
   beforeEach(async () => {
     const tmp = await createTempDir()
     dataDir = tmp.path
     cleanup = tmp.cleanup
-    app = createApp(dataDir)
+    app = await createApp(dataDir)
     mockExecute.mockClear()
     mockFail.mockClear()
   })

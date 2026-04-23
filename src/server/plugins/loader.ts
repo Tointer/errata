@@ -1,9 +1,8 @@
-import { readFile, readdir, stat } from 'node:fs/promises'
 import { join, resolve } from 'node:path'
-import { existsSync } from 'node:fs'
 import { pathToFileURL } from 'node:url'
 import type { WritingPlugin } from './types'
 import { registerRuntimePluginUi } from './runtime-ui'
+import { getStorageBackend } from '../storage/runtime'
 
 const SERVER_ENTRY_CANDIDATES = ['entry.server.ts', 'entry.server.js', 'plugin.ts', 'plugin.js']
 
@@ -21,28 +20,28 @@ interface PluginJson {
   panel?: PluginJsonPanel
 }
 
-function resolvePluginEntryPath(pluginsDir: string, name: string): string | null {
+async function resolvePluginEntryPath(pluginsDir: string, name: string): Promise<string | null> {
+  const storage = getStorageBackend()
   for (const entryFile of SERVER_ENTRY_CANDIDATES) {
     const fullPath = join(pluginsDir, name, entryFile)
-    if (existsSync(fullPath)) return fullPath
+    if (await storage.exists(fullPath)) return fullPath
   }
   return null
 }
 
 export async function discoverPlugins(pluginsDir: string): Promise<string[]> {
-  if (!existsSync(pluginsDir)) return []
+  const storage = getStorageBackend()
+  if (!(await storage.exists(pluginsDir))) return []
 
-  const entries = await readdir(pluginsDir)
+  const entries = await storage.listDirDetailed(pluginsDir)
   const names: string[] = []
 
   for (const entry of entries) {
-    const entryPath = join(pluginsDir, entry)
-    const entryStat = await stat(entryPath)
-    if (!entryStat.isDirectory()) continue
+    if (!entry.isDirectory) continue
 
-    const pluginEntry = resolvePluginEntryPath(pluginsDir, entry)
+    const pluginEntry = await resolvePluginEntryPath(pluginsDir, entry.name)
     if (pluginEntry) {
-      names.push(entry)
+      names.push(entry.name)
     }
   }
 
@@ -53,7 +52,8 @@ export async function loadPlugin(
   pluginsDir: string,
   name: string,
 ): Promise<WritingPlugin> {
-  const pluginPath = resolvePluginEntryPath(pluginsDir, name)
+  const storage = getStorageBackend()
+  const pluginPath = await resolvePluginEntryPath(pluginsDir, name)
   if (!pluginPath) {
     throw new Error(
       `Plugin "${name}" has no supported server entrypoint (${SERVER_ENTRY_CANDIDATES.join(', ')})`,
@@ -71,9 +71,9 @@ export async function loadPlugin(
 
   const pluginRoot = resolve(join(pluginsDir, name))
   const pluginJsonPath = join(pluginRoot, 'plugin.json')
-  if (existsSync(pluginJsonPath)) {
+  if (await storage.exists(pluginJsonPath)) {
     try {
-      const pluginJson = JSON.parse(await readFile(pluginJsonPath, 'utf-8')) as PluginJson
+      const pluginJson = JSON.parse(await storage.readText(pluginJsonPath)) as PluginJson
 
       if (pluginJson.name && pluginJson.name !== plugin.manifest.name) {
         throw new Error(

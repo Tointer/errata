@@ -1,16 +1,13 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
-import { mkdir, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { existsSync } from 'node:fs'
 import { createTempDir } from '../setup'
 import {
-  clearMigrationCache,
   createBranch,
   deleteBranch,
   getBranchesIndex,
   getContentRoot,
   getContentRootForBranch,
-  migrateIfNeeded,
   renameBranch,
   switchActiveBranch,
   withBranch,
@@ -40,6 +37,7 @@ function makeStory(id: string = TEST_STORY_ID): StoryMeta {
       maxSteps: 10,
       modelOverrides: {},
       generationMode: 'standard' as const,
+      disableLibrarianAutoAnalysis: false,
       autoApplyLibrarianSuggestions: false,
       disableLibrarianDirections: false,
       disableLibrarianSuggestions: false,
@@ -48,19 +46,18 @@ function makeStory(id: string = TEST_STORY_ID): StoryMeta {
       contextCompact: { type: 'proseLimit', value: 10 },
       summaryCompact: { maxCharacters: 12000, targetCharacters: 9000 },
       enableHierarchicalSummary: false,
+      disableThinking: false,
     },
   }
 }
 
 beforeEach(async () => {
-  clearMigrationCache()
   const temp = await createTempDir()
   dataDir = temp.path
   cleanup = temp.cleanup
 })
 
 afterEach(async () => {
-  clearMigrationCache()
   await cleanup()
 })
 
@@ -88,16 +85,6 @@ describe('branches compatibility', () => {
     const storyDir = join(dataDir, 'stories', TEST_STORY_ID)
     expect(existsSync(storyDir)).toBe(true)
     expect(existsSync(join(storyDir, '.errata', 'fragments'))).toBe(true)
-  })
-
-  it('keeps migration as a no-op compatibility hook', async () => {
-    const storyDir = join(dataDir, 'stories', TEST_STORY_ID)
-    await mkdir(storyDir, { recursive: true })
-    await writeFile(join(storyDir, 'legacy.txt'), 'legacy', 'utf-8')
-
-    await migrateIfNeeded(storyDir)
-
-    expect(existsSync(join(storyDir, 'legacy.txt'))).toBe(true)
   })
 
   it('executes withBranch without changing storage scope', async () => {

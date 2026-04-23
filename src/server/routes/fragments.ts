@@ -11,7 +11,6 @@ import {
   archiveFragment,
   restoreFragment,
   isFragmentArchived,
-  listFragmentVersions,
   revertFragmentToVersion,
 } from '../fragments/storage'
 import {
@@ -90,7 +89,7 @@ export function fragmentRoutes(dataDir: string) {
 
     .get('/stories/:storyId/fragments', async ({ params, query }) => {
       const type = query.type as string | undefined
-      const includeArchived = query.includeArchived === true || query.includeArchived === 'true'
+      const includeArchived = String(query.includeArchived) === 'true'
       return listFragments(dataDir, params.storyId, type, { includeArchived })
     }, { detail: { summary: 'List fragments, optionally filtered by type' } })
 

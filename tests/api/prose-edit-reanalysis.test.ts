@@ -19,13 +19,13 @@ const mockedTriggerLibrarian = vi.mocked(triggerLibrarian)
 
 let dataDir: string
 let cleanup: () => Promise<void>
-let app: ReturnType<typeof createApp>
+let app: Awaited<ReturnType<typeof createApp>>
 
 beforeEach(async () => {
   const tmp = await createTempDir()
   dataDir = tmp.path
   cleanup = tmp.cleanup
-  app = createApp(dataDir)
+  app = await createApp(dataDir)
   mockedTriggerLibrarian.mockClear()
 })
 

@@ -1,10 +1,7 @@
-import { readFile, mkdir } from 'node:fs/promises'
-import { join, dirname } from 'node:path'
-import { existsSync } from 'node:fs'
 import { z } from 'zod/v4'
 import { BlockConfigSchema, type CustomBlockDefinition, type BlockOverride } from '../blocks/schema'
-import { getInternalStoryPath } from '../md-files/paths'
-import { writeJsonAtomic } from '../fs-utils'
+import { getStoryInternalPath } from '../storage/story-layout'
+import { getStorageBackend } from '../storage/runtime'
 
 export const AgentBlockConfigSchema = BlockConfigSchema.extend({
   disabledTools: z.array(z.string()).default([]),
@@ -13,30 +10,31 @@ export const AgentBlockConfigSchema = BlockConfigSchema.extend({
 
 export type AgentBlockConfig = z.infer<typeof AgentBlockConfigSchema>
 
-async function agentBlockConfigPath(dataDir: string, storyId: string, agentName: string): Promise<string> {
-  return getInternalStoryPath(dataDir, storyId, 'agent-blocks', `${agentName}.json`)
-}
-
 function emptyConfig(): AgentBlockConfig {
   return { customBlocks: [], overrides: {}, blockOrder: [], disabledTools: [], disableAutoAnalysis: false }
 }
 
+function getAgentBlockConfigPath(dataDir: string, storyId: string, agentName: string): string {
+  return getStoryInternalPath(dataDir, storyId, 'agent-blocks', `${agentName}.json`)
+}
+
 export async function getAgentBlockConfig(dataDir: string, storyId: string, agentName: string): Promise<AgentBlockConfig> {
-  const path = await agentBlockConfigPath(dataDir, storyId, agentName)
-  if (!existsSync(path)) return emptyConfig()
+  const storage = getStorageBackend()
+  const config = await storage.readJsonOrDefault(
+    getAgentBlockConfigPath(dataDir, storyId, agentName),
+    emptyConfig(),
+  )
 
   try {
-    const raw = await readFile(path, 'utf-8')
-    return AgentBlockConfigSchema.parse(JSON.parse(raw))
+    return AgentBlockConfigSchema.parse(config)
   } catch {
     return emptyConfig()
   }
 }
 
 export async function saveAgentBlockConfig(dataDir: string, storyId: string, agentName: string, config: AgentBlockConfig): Promise<void> {
-  const path = await agentBlockConfigPath(dataDir, storyId, agentName)
-  await mkdir(dirname(path), { recursive: true })
-  await writeJsonAtomic(path, config)
+  const storage = getStorageBackend()
+  await storage.writeJson(getAgentBlockConfigPath(dataDir, storyId, agentName), config)
 }
 
 export async function addAgentCustomBlock(

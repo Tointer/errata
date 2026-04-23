@@ -210,7 +210,7 @@ export function StoryInfoPanel({ storyId, story, onLaunchWizard, onExport, onDow
           <Textarea
             value={description}
             onChange={(e) => setDescription(e.target.value)}
-            className="min-h-[80px] resize-none text-sm bg-transparent"
+            className="min-h-20 resize-none text-sm bg-transparent"
             data-component-id="story-info-description"
           />
         </div>
@@ -219,7 +219,7 @@ export function StoryInfoPanel({ storyId, story, onLaunchWizard, onExport, onDow
           <Textarea
             value={summary}
             onChange={(e) => setSummary(e.target.value)}
-            className="min-h-[120px] resize-none text-sm bg-transparent"
+            className="min-h-30 resize-none text-sm bg-transparent"
             placeholder="Story summary..."
             data-component-id="story-info-summary"
           />
@@ -248,7 +248,7 @@ export function StoryInfoPanel({ storyId, story, onLaunchWizard, onExport, onDow
             className="w-full object-cover"
             style={{ aspectRatio: '3/2', maxHeight: 200 }}
           />
-          <div className="absolute inset-0 bg-gradient-to-t from-background/80 via-transparent to-transparent" />
+          <div className="absolute inset-0 bg-linear-to-t from-background/80 via-transparent to-transparent" />
         </div>
       )}
 
@@ -532,7 +532,7 @@ function SummarySection({ summary }: { summary: string | undefined }) {
           <p className="text-[0.8125rem] leading-relaxed mt-1.5 text-foreground/80 font-prose whitespace-pre-wrap">{summary}</p>
         </div>
         {overflows && !expanded && (
-          <div className="absolute bottom-0 left-0 right-0 h-16 bg-gradient-to-t from-background to-transparent pointer-events-none" />
+          <div className="absolute bottom-0 left-0 right-0 h-16 bg-linear-to-t from-background to-transparent pointer-events-none" />
         )}
         {overflows && (
           <button

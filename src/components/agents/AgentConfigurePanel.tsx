@@ -299,7 +299,7 @@ function AgentBlockEditor({ storyId, agentName, agents, onBack }: AgentBlockEdit
   })
 
   const modelOverrideMutation = useMutation({
-    mutationFn: (data: { modelOverrides: Record<string, { providerId?: string | null; modelId?: string | null }> }) =>
+    mutationFn: (data: { modelOverrides: Record<string, { providerId?: string | null; modelId?: string | null; temperature?: number | null }> }) =>
       api.settings.update(storyId, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['story', storyId] })

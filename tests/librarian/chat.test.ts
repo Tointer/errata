@@ -74,14 +74,14 @@ async function* createMockFullStream(events: Array<{ type: string; [key: string]
 describe('librarian chat endpoint', () => {
   let dataDir: string
   let cleanup: () => Promise<void>
-  let app: ReturnType<typeof createApp>
+  let app: Awaited<ReturnType<typeof createApp>>
 
   beforeEach(async () => {
     const tmp = await createTempDir()
     dataDir = tmp.path
     cleanup = tmp.cleanup
     await seedTestProvider(dataDir)
-    app = createApp(dataDir)
+    app = await createApp(dataDir)
     mockAgentInstances.length = 0
     mockAgentCtor.mockClear()
     mockAgentStream.mockClear()

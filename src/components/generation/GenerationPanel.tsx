@@ -123,7 +123,7 @@ export function GenerationPanel({ storyId, onBack }: GenerationPanelProps) {
           {streamedText && (
             <>
               <div ref={outputRef} className="flex-1 overflow-auto px-6 py-6" data-component-id="generation-output">
-                <div className="max-w-[38rem] mx-auto">
+                <div className="max-w-152 mx-auto">
                   <StreamMarkdown content={streamedText} streaming={isGenerating} variant="prose" />
                 </div>
               </div>
@@ -143,7 +143,7 @@ export function GenerationPanel({ storyId, onBack }: GenerationPanelProps) {
               value={input}
               onChange={(e) => setInput(e.target.value)}
               placeholder="Describe what should happen next in the story..."
-              className="min-h-[80px] resize-none text-sm bg-transparent placeholder:italic placeholder:text-muted-foreground"
+              className="min-h-20 resize-none text-sm bg-transparent placeholder:italic placeholder:text-muted-foreground"
               disabled={isGenerating}
               onKeyDown={(e) => {
                 if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {

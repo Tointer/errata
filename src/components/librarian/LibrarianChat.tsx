@@ -222,7 +222,7 @@ export function LibrarianChat({ storyId, conversationId, initialInput }: Librari
         <div className="p-3 space-y-3">
           {messages.length === 0 && (
             <div className="flex flex-col items-center justify-center py-12 text-center" data-component-id="librarian-chat-empty">
-              <EmptyHint className="max-w-[240px]">
+              <EmptyHint className="max-w-60">
                 Ask the librarian to make changes across your story — update characters, adjust guidelines, or reshape knowledge.
               </EmptyHint>
             </div>
@@ -246,7 +246,7 @@ export function LibrarianChat({ storyId, conversationId, initialInput }: Librari
                     streaming={isStreaming && i === messages.length - 1}
                   />
                 ) : (
-                  <div className="break-words whitespace-pre-wrap">{msg.content}</div>
+                  <div className="wrap-break-word whitespace-pre-wrap">{msg.content}</div>
                 )}
               </div>
             </div>
@@ -272,7 +272,7 @@ export function LibrarianChat({ storyId, conversationId, initialInput }: Librari
             onKeyDown={handleKeyDown}
             placeholder="Ask the librarian..."
             disabled={isStreaming}
-            className="min-h-[40px] max-h-[400px] resize-none text-xs bg-transparent placeholder:italic placeholder:text-muted-foreground flex-1"
+            className="min-h-10 max-h-100 resize-none text-xs bg-transparent placeholder:italic placeholder:text-muted-foreground flex-1"
             rows={1}
             data-component-id="librarian-chat-input"
           />

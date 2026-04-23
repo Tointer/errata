@@ -6,12 +6,10 @@
  * per-story on disk.
  */
 
-import { readFile, mkdir } from 'node:fs/promises'
-import { join } from 'node:path'
-import { existsSync } from 'node:fs'
 import { createLogger } from '../logging'
-import { getInternalStoryPath, getInternalStoryRoot } from '../md-files/paths'
-import { writeJsonAtomic } from '../fs-utils'
+import { getStoryInternalPath as getInternalStoryPath } from '../storage/story-layout'
+import { getStorageBackend } from '../storage/runtime'
+import { createDebouncedKeyedBatchQueue } from '../storage/stores/keyed-operations'
 
 const logger = createLogger('token-tracker')
 
@@ -54,7 +52,6 @@ const globalSessionByModel = new Map<string, UsageEntry>()
 // Debounced persistence
 // ---------------------------------------------------------------------------
 
-const pendingWrites = new Map<string, NodeJS.Timeout>()
 const FLUSH_DELAY_MS = 2000
 
 function usagePath(dataDir: string, storyId: string): string {
@@ -66,11 +63,11 @@ function emptyProjectUsage(): ProjectUsage {
 }
 
 async function readProjectFile(dataDir: string, storyId: string): Promise<ProjectUsage> {
+  const storage = getStorageBackend()
   const path = usagePath(dataDir, storyId)
-  if (!existsSync(path)) return emptyProjectUsage()
+  const parsed = await storage.readJsonIfExists<ProjectUsage>(path)
+  if (!parsed) return emptyProjectUsage()
   try {
-    const raw = await readFile(path, 'utf-8')
-    const parsed = JSON.parse(raw) as ProjectUsage
     // Migrate older format that lacked byModel at top level or per-source
     if (!parsed.byModel) parsed.byModel = {}
     for (const key of Object.keys(parsed.sources)) {
@@ -83,9 +80,8 @@ async function readProjectFile(dataDir: string, storyId: string): Promise<Projec
 }
 
 async function writeProjectFile(dataDir: string, storyId: string, data: ProjectUsage): Promise<void> {
-  const dir = getInternalStoryRoot(dataDir, storyId)
-  await mkdir(dir, { recursive: true })
-  await writeJsonAtomic(usagePath(dataDir, storyId), data)
+  const storage = getStorageBackend()
+  await storage.writeJson(usagePath(dataDir, storyId), data)
 }
 
 interface FlushDelta {
@@ -95,8 +91,40 @@ interface FlushDelta {
   outputTokens: number
 }
 
-/** Buffered deltas waiting for flush */
-const pendingFlushData = new Map<string, FlushDelta[]>()
+async function flushUsageBatch(key: string, deltas: FlushDelta[]): Promise<void> {
+  const separatorIndex = key.indexOf('::')
+  const dataDir = key.slice(0, separatorIndex)
+  const storyId = key.slice(separatorIndex + 2)
+
+  try {
+    const project = await readProjectFile(dataDir, storyId)
+    for (const d of deltas) {
+      const sourceEntry = project.sources[d.source] ?? { inputTokens: 0, outputTokens: 0, calls: 0, byModel: {} }
+      incrementEntry(sourceEntry, d.inputTokens, d.outputTokens)
+
+      const sourceModelEntry = sourceEntry.byModel[d.modelId] ?? { inputTokens: 0, outputTokens: 0, calls: 0 }
+      incrementEntry(sourceModelEntry, d.inputTokens, d.outputTokens)
+      sourceEntry.byModel[d.modelId] = sourceModelEntry
+
+      project.sources[d.source] = sourceEntry
+
+      incrementEntry(project.total, d.inputTokens, d.outputTokens)
+
+      const globalModelEntry = project.byModel[d.modelId] ?? { inputTokens: 0, outputTokens: 0, calls: 0 }
+      incrementEntry(globalModelEntry, d.inputTokens, d.outputTokens)
+      project.byModel[d.modelId] = globalModelEntry
+    }
+    project.updatedAt = new Date().toISOString()
+    await writeProjectFile(dataDir, storyId, project)
+  } catch (err) {
+    logger.error('Failed to flush token usage', { storyId, error: err instanceof Error ? err.message : String(err) })
+  }
+}
+
+const enqueueUsageFlush = createDebouncedKeyedBatchQueue<FlushDelta>({
+  delayMs: FLUSH_DELAY_MS,
+  flush: flushUsageBatch,
+})
 
 function incrementEntry(entry: UsageEntry, inputTokens: number, outputTokens: number): void {
   entry.inputTokens += inputTokens
@@ -106,49 +134,7 @@ function incrementEntry(entry: UsageEntry, inputTokens: number, outputTokens: nu
 
 function scheduleFlush(dataDir: string, storyId: string, delta: FlushDelta): void {
   const key = `${dataDir}::${storyId}`
-
-  const existing = pendingFlushData.get(key) ?? []
-  existing.push(delta)
-  pendingFlushData.set(key, existing)
-
-  if (pendingWrites.has(key)) return // already scheduled
-
-  const timer = setTimeout(async () => {
-    pendingWrites.delete(key)
-    const deltas = pendingFlushData.get(key) ?? []
-    pendingFlushData.delete(key)
-    if (deltas.length === 0) return
-
-    try {
-      const project = await readProjectFile(dataDir, storyId)
-      for (const d of deltas) {
-        // Per-source totals
-        const sourceEntry = project.sources[d.source] ?? { inputTokens: 0, outputTokens: 0, calls: 0, byModel: {} }
-        incrementEntry(sourceEntry, d.inputTokens, d.outputTokens)
-
-        // Per-source per-model
-        const sourceModelEntry = sourceEntry.byModel[d.modelId] ?? { inputTokens: 0, outputTokens: 0, calls: 0 }
-        incrementEntry(sourceModelEntry, d.inputTokens, d.outputTokens)
-        sourceEntry.byModel[d.modelId] = sourceModelEntry
-
-        project.sources[d.source] = sourceEntry
-
-        // Global totals
-        incrementEntry(project.total, d.inputTokens, d.outputTokens)
-
-        // Global per-model
-        const globalModelEntry = project.byModel[d.modelId] ?? { inputTokens: 0, outputTokens: 0, calls: 0 }
-        incrementEntry(globalModelEntry, d.inputTokens, d.outputTokens)
-        project.byModel[d.modelId] = globalModelEntry
-      }
-      project.updatedAt = new Date().toISOString()
-      await writeProjectFile(dataDir, storyId, project)
-    } catch (err) {
-      logger.error('Failed to flush token usage', { storyId, error: err instanceof Error ? err.message : String(err) })
-    }
-  }, FLUSH_DELAY_MS)
-
-  pendingWrites.set(key, timer)
+  enqueueUsageFlush(key, delta)
 }
 
 // ---------------------------------------------------------------------------

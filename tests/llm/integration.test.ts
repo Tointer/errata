@@ -73,7 +73,7 @@ function createMockStreamResult(text: string) {
 describe('end-to-end generation integration', () => {
   let dataDir: string
   let cleanup: () => Promise<void>
-  let app: ReturnType<typeof createApp>
+  let app: Awaited<ReturnType<typeof createApp>>
 
   async function api(path: string, init?: RequestInit) {
     return app.fetch(new Request(`http://localhost/api${path}`, init))
@@ -84,7 +84,7 @@ describe('end-to-end generation integration', () => {
     dataDir = temp.path
     cleanup = temp.cleanup
     await seedTestProvider(dataDir)
-    app = createApp(dataDir)
+    app = await createApp(dataDir)
     mockAgentCtor.mockClear()
     mockAgentStream.mockClear()
   })

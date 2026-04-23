@@ -1,8 +1,9 @@
-import { mkdir, readdir, readFile } from 'node:fs/promises'
-import { join } from 'node:path'
-import { existsSync } from 'node:fs'
-import { getInternalStoryPath } from '../md-files/paths'
-import { writeJsonAtomic } from '../fs-utils'
+import {
+  deleteCharacterChatConversationRecord,
+  listCharacterChatConversationIds,
+  readCharacterChatConversationRecord,
+  writeCharacterChatConversationRecord,
+} from './file-store'
 
 // --- Types ---
 
@@ -48,22 +49,6 @@ export function generateConversationId(): string {
   return `cc-${ts}-${rand}`
 }
 
-// --- Path helpers ---
-
-async function characterChatDir(dataDir: string, storyId: string): Promise<string> {
-  return getInternalStoryPath(dataDir, storyId, 'character-chat')
-}
-
-async function conversationsDir(dataDir: string, storyId: string): Promise<string> {
-  const dir = await characterChatDir(dataDir, storyId)
-  return join(dir, 'conversations')
-}
-
-async function conversationPath(dataDir: string, storyId: string, conversationId: string): Promise<string> {
-  const dir = await conversationsDir(dataDir, storyId)
-  return join(dir, `${conversationId}.json`)
-}
-
 // --- CRUD ---
 
 export async function saveConversation(
@@ -71,12 +56,7 @@ export async function saveConversation(
   storyId: string,
   conversation: CharacterChatConversation,
 ): Promise<void> {
-  const dir = await conversationsDir(dataDir, storyId)
-  await mkdir(dir, { recursive: true })
-  await writeJsonAtomic(
-    await conversationPath(dataDir, storyId, conversation.id),
-    conversation,
-  )
+  await writeCharacterChatConversationRecord(dataDir, storyId, conversation.id, conversation)
 }
 
 export async function getConversation(
@@ -84,10 +64,7 @@ export async function getConversation(
   storyId: string,
   conversationId: string,
 ): Promise<CharacterChatConversation | null> {
-  const path = await conversationPath(dataDir, storyId, conversationId)
-  if (!existsSync(path)) return null
-  const raw = await readFile(path, 'utf-8')
-  return JSON.parse(raw) as CharacterChatConversation
+  return readCharacterChatConversationRecord(dataDir, storyId, conversationId)
 }
 
 export async function listConversations(
@@ -95,16 +72,11 @@ export async function listConversations(
   storyId: string,
   characterId?: string,
 ): Promise<CharacterChatConversationSummary[]> {
-  const dir = await conversationsDir(dataDir, storyId)
-  if (!existsSync(dir)) return []
-
-  const entries = await readdir(dir)
   const summaries: CharacterChatConversationSummary[] = []
 
-  for (const entry of entries) {
-    if (!entry.endsWith('.json')) continue
-    const raw = await readFile(join(dir, entry), 'utf-8')
-    const conv = JSON.parse(raw) as CharacterChatConversation
+  for (const conversationId of await listCharacterChatConversationIds(dataDir, storyId)) {
+    const conv = await readCharacterChatConversationRecord<CharacterChatConversation>(dataDir, storyId, conversationId)
+    if (!conv) continue
 
     if (characterId && conv.characterId !== characterId) continue
 
@@ -130,9 +102,5 @@ export async function deleteConversation(
   storyId: string,
   conversationId: string,
 ): Promise<boolean> {
-  const path = await conversationPath(dataDir, storyId, conversationId)
-  if (!existsSync(path)) return false
-  const { unlink } = await import('node:fs/promises')
-  await unlink(path)
-  return true
+  return deleteCharacterChatConversationRecord(dataDir, storyId, conversationId)
 }

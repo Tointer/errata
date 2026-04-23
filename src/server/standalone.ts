@@ -1,5 +1,6 @@
 import { createServer } from 'node:http'
 import { Readable } from 'node:stream'
+import type { ReadableStream as WebReadableStream } from 'node:stream/web'
 import { getApp } from './init'
 
 function resolvePort(): number {
@@ -79,7 +80,7 @@ function toRequest(req: import('node:http').IncomingMessage, hostname: string, p
     headers,
     body,
     duplex: body ? 'half' : undefined,
-  })
+  } as RequestInit & { duplex?: 'half' })
 }
 
 const app = await getApp()
@@ -118,7 +119,7 @@ const server = createServer(async (req, res) => {
       return
     }
 
-    Readable.fromWeb(response.body as ReadableStream<Uint8Array>).pipe(res)
+    Readable.fromWeb(response.body as WebReadableStream<Uint8Array>).pipe(res)
   } catch (error) {
     console.error('[server] Unhandled request error', error)
     res.statusCode = 500

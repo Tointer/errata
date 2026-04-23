@@ -1,10 +1,13 @@
 import { createOpenAICompatible } from '@ai-sdk/openai-compatible'
+import type { ProviderOptions } from '@ai-sdk/provider-utils'
 import { getGlobalConfig } from '../config/storage'
 import { getStory } from '../fragments/storage'
 import { modelRoleRegistry } from '../agents/model-role-registry'
 import { ensureCoreAgentsRegistered } from '../agents/register-core'
 import type { LanguageModel } from 'ai'
 import { createLogger } from '../logging'
+
+export type { ProviderOptions }
 
 // Normalize old camelCase modelOverrides keys to dot-separated agent names
 const OVERRIDE_KEY_ALIASES: Record<string, string> = {
@@ -60,8 +63,6 @@ function getCachedProvider(id: string, baseURL: string, apiKey: string, name: st
   }
   return provider
 }
-
-export type ProviderOptions = Record<string, Record<string, unknown>>
 
 /**
  * Build providerOptions that suppress extended thinking / reasoning.

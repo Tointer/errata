@@ -10,7 +10,6 @@ import type { StoryMeta, Fragment } from '@/server/fragments/schema'
 
 const MAPEPO_ID = 'ch-mapepo'
 const DEKUVA_ID = 'ch-dekuva'
-const THIRD_ID = 'ch-c'
 const TONE_GUIDE_ID = 'gl-tone-guide'
 const WORLD_LORE_ID = 'kn-world-lore'
 
