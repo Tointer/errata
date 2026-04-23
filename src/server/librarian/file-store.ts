@@ -7,7 +7,14 @@ import {
   getLibrarianStateFile,
   getLibrarianAnalysesDir,
 } from './layout'
-import { getStorageBackend } from '../storage/runtime'
+import {
+  deleteJsonRecord,
+  deleteJsonRecordIfExists,
+  listJsonRecordIds,
+  readJsonRecordIfExists,
+  readJsonRecordOrDefault,
+  writeJsonRecord,
+} from '../storage/stores/json-records'
 
 export async function writeLibrarianAnalysisRecord(
   dataDir: string,
@@ -15,7 +22,7 @@ export async function writeLibrarianAnalysisRecord(
   analysisId: string,
   value: unknown,
 ): Promise<void> {
-  await getStorageBackend().writeJson(getLibrarianAnalysisFile(dataDir, storyId, analysisId), value)
+  await writeJsonRecord(getLibrarianAnalysisFile(dataDir, storyId, analysisId), value)
 }
 
 export async function readLibrarianAnalysisRecord<T>(
@@ -23,7 +30,7 @@ export async function readLibrarianAnalysisRecord<T>(
   storyId: string,
   analysisId: string,
 ): Promise<T | null> {
-  return getStorageBackend().readJsonIfExists<T>(getLibrarianAnalysisFile(dataDir, storyId, analysisId))
+  return readJsonRecordIfExists<T>(getLibrarianAnalysisFile(dataDir, storyId, analysisId))
 }
 
 export async function deleteLibrarianAnalysisRecord(
@@ -31,24 +38,14 @@ export async function deleteLibrarianAnalysisRecord(
   storyId: string,
   analysisId: string,
 ): Promise<boolean> {
-  const storage = getStorageBackend()
-  const path = getLibrarianAnalysisFile(dataDir, storyId, analysisId)
-  if (!(await storage.exists(path))) return false
-  await storage.delete(path)
-  return true
+  return deleteJsonRecord(getLibrarianAnalysisFile(dataDir, storyId, analysisId))
 }
 
 export async function listLibrarianAnalysisIds(
   dataDir: string,
   storyId: string,
 ): Promise<string[]> {
-  const storage = getStorageBackend()
-  const dir = getLibrarianAnalysesDir(dataDir, storyId)
-  if (!(await storage.exists(dir))) return []
-
-  return (await storage.listDir(dir))
-    .filter((entry) => entry.endsWith('.json'))
-    .map((entry) => entry.replace(/\.json$/i, ''))
+  return listJsonRecordIds(getLibrarianAnalysesDir(dataDir, storyId))
 }
 
 export async function writeLibrarianAnalysisIndexRecord(
@@ -56,14 +53,14 @@ export async function writeLibrarianAnalysisIndexRecord(
   storyId: string,
   value: unknown,
 ): Promise<void> {
-  await getStorageBackend().writeJson(getLibrarianAnalysisIndexFile(dataDir, storyId), value)
+  await writeJsonRecord(getLibrarianAnalysisIndexFile(dataDir, storyId), value)
 }
 
 export async function readLibrarianAnalysisIndexRecord<T>(
   dataDir: string,
   storyId: string,
 ): Promise<T | null> {
-  return getStorageBackend().readJsonIfExists<T>(getLibrarianAnalysisIndexFile(dataDir, storyId))
+  return readJsonRecordIfExists<T>(getLibrarianAnalysisIndexFile(dataDir, storyId))
 }
 
 export async function readLibrarianStateRecord<T>(
@@ -71,7 +68,7 @@ export async function readLibrarianStateRecord<T>(
   storyId: string,
   fallback: T,
 ): Promise<T> {
-  return getStorageBackend().readJsonOrDefault(getLibrarianStateFile(dataDir, storyId), fallback)
+  return readJsonRecordOrDefault(getLibrarianStateFile(dataDir, storyId), fallback)
 }
 
 export async function writeLibrarianStateRecord(
@@ -79,7 +76,7 @@ export async function writeLibrarianStateRecord(
   storyId: string,
   value: unknown,
 ): Promise<void> {
-  await getStorageBackend().writeJson(getLibrarianStateFile(dataDir, storyId), value)
+  await writeJsonRecord(getLibrarianStateFile(dataDir, storyId), value)
 }
 
 export async function readLibrarianChatHistoryRecord<T>(
@@ -87,7 +84,7 @@ export async function readLibrarianChatHistoryRecord<T>(
   storyId: string,
   fallback: T,
 ): Promise<T> {
-  return getStorageBackend().readJsonOrDefault(getLibrarianChatHistoryFile(dataDir, storyId), fallback)
+  return readJsonRecordOrDefault(getLibrarianChatHistoryFile(dataDir, storyId), fallback)
 }
 
 export async function writeLibrarianChatHistoryRecord(
@@ -95,14 +92,14 @@ export async function writeLibrarianChatHistoryRecord(
   storyId: string,
   value: unknown,
 ): Promise<void> {
-  await getStorageBackend().writeJson(getLibrarianChatHistoryFile(dataDir, storyId), value)
+  await writeJsonRecord(getLibrarianChatHistoryFile(dataDir, storyId), value)
 }
 
 export async function deleteLibrarianChatHistoryRecord(
   dataDir: string,
   storyId: string,
 ): Promise<void> {
-  await getStorageBackend().deleteIfExists(getLibrarianChatHistoryFile(dataDir, storyId))
+  await deleteJsonRecordIfExists(getLibrarianChatHistoryFile(dataDir, storyId))
 }
 
 export async function readLibrarianConversationsIndexRecord<T>(
@@ -110,7 +107,7 @@ export async function readLibrarianConversationsIndexRecord<T>(
   storyId: string,
   fallback: T,
 ): Promise<T> {
-  return getStorageBackend().readJsonOrDefault(getLibrarianConversationsIndexFile(dataDir, storyId), fallback)
+  return readJsonRecordOrDefault(getLibrarianConversationsIndexFile(dataDir, storyId), fallback)
 }
 
 export async function writeLibrarianConversationsIndexRecord(
@@ -118,7 +115,7 @@ export async function writeLibrarianConversationsIndexRecord(
   storyId: string,
   value: unknown,
 ): Promise<void> {
-  await getStorageBackend().writeJson(getLibrarianConversationsIndexFile(dataDir, storyId), value)
+  await writeJsonRecord(getLibrarianConversationsIndexFile(dataDir, storyId), value)
 }
 
 export async function readLibrarianConversationHistoryRecord<T>(
@@ -127,7 +124,7 @@ export async function readLibrarianConversationHistoryRecord<T>(
   conversationId: string,
   fallback: T,
 ): Promise<T> {
-  return getStorageBackend().readJsonOrDefault(getLibrarianConversationHistoryFile(dataDir, storyId, conversationId), fallback)
+  return readJsonRecordOrDefault(getLibrarianConversationHistoryFile(dataDir, storyId, conversationId), fallback)
 }
 
 export async function writeLibrarianConversationHistoryRecord(
@@ -136,7 +133,7 @@ export async function writeLibrarianConversationHistoryRecord(
   conversationId: string,
   value: unknown,
 ): Promise<void> {
-  await getStorageBackend().writeJson(getLibrarianConversationHistoryFile(dataDir, storyId, conversationId), value)
+  await writeJsonRecord(getLibrarianConversationHistoryFile(dataDir, storyId, conversationId), value)
 }
 
 export async function deleteLibrarianConversationHistoryRecord(
@@ -144,5 +141,5 @@ export async function deleteLibrarianConversationHistoryRecord(
   storyId: string,
   conversationId: string,
 ): Promise<void> {
-  await getStorageBackend().deleteIfExists(getLibrarianConversationHistoryFile(dataDir, storyId, conversationId))
+  await deleteJsonRecordIfExists(getLibrarianConversationHistoryFile(dataDir, storyId, conversationId))
 }

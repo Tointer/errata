@@ -1,16 +1,6 @@
 import type { LogEntry, LogSummary } from './types'
 import { getStorageBackend } from '../storage/runtime'
-import {
-  appendLogEntry,
-  getLogFilePath,
-  getLogFilesDir,
-  isAppLogFileName,
-  parseAppLogFileIndex,
-  readParsedLogEntries,
-  resolveWritableLogFileIndex,
-  rotateLogFiles,
-  MAX_LOG_FILES,
-} from './log-files'
+import * as logFiles from './log-files'
 
 /**
  * Save a log entry to the application log file.
@@ -18,16 +8,16 @@ import {
  */
 export async function saveLogEntry(dataDir: string, entry: LogEntry): Promise<void> {
   const storage = getStorageBackend()
-  const dir = getLogFilesDir(dataDir)
+  const dir = logFiles.getLogFilesDir(dataDir)
   await storage.ensureDir(dir)
 
-  let currentIndex = await resolveWritableLogFileIndex(storage, dataDir)
+  let currentIndex = await logFiles.resolveWritableLogFileIndex(storage, dataDir)
 
-  if (currentIndex >= MAX_LOG_FILES) {
-    currentIndex = await rotateLogFiles(storage, dataDir)
+  if (currentIndex >= logFiles.MAX_LOG_FILES) {
+    currentIndex = await logFiles.rotateLogFiles(storage, dataDir)
   }
 
-  await appendLogEntry(storage, dataDir, currentIndex, entry)
+  await logFiles.appendLogEntry(storage, dataDir, currentIndex, entry)
 }
 
 /**
@@ -44,7 +34,7 @@ export async function listLogs(
 ): Promise<LogSummary[]> {
   const storage = getStorageBackend()
   const { level, component, storyId, limit = 100 } = options
-  const logEntries = await readParsedLogEntries(storage, dataDir, Array.from({ length: MAX_LOG_FILES }, (_, i) => MAX_LOG_FILES - 1 - i))
+  const logEntries = await logFiles.readParsedLogEntries(storage, dataDir, Array.from({ length: logFiles.MAX_LOG_FILES }, (_, i) => logFiles.MAX_LOG_FILES - 1 - i))
 
   const entries = logEntries
     .filter((entry) => !level || entry.level === level)
@@ -68,7 +58,7 @@ export async function listLogs(
  */
 export async function getLogEntry(dataDir: string, logId: string): Promise<LogEntry | null> {
   const storage = getStorageBackend()
-  return (await readParsedLogEntries(storage, dataDir, Array.from({ length: MAX_LOG_FILES }, (_, i) => i)))
+  return (await logFiles.readParsedLogEntries(storage, dataDir, Array.from({ length: logFiles.MAX_LOG_FILES }, (_, i) => i)))
     .find((entry) => entry.id === logId) ?? null
 }
 
@@ -77,13 +67,13 @@ export async function getLogEntry(dataDir: string, logId: string): Promise<LogEn
  */
 export async function clearLogs(dataDir: string): Promise<void> {
   const storage = getStorageBackend()
-  const dir = getLogFilesDir(dataDir)
+  const dir = logFiles.getLogFilesDir(dataDir)
   const entries = await storage.listDir(dir)
   for (const entry of entries) {
-    if (!isAppLogFileName(entry)) continue
+    if (!logFiles.isAppLogFileName(entry)) continue
 
-    const index = parseAppLogFileIndex(entry)
+    const index = logFiles.parseAppLogFileIndex(entry)
     if (index === null) continue
-    await storage.writeText(getLogFilePath(dataDir, index), '')
+    await storage.writeText(logFiles.getLogFilePath(dataDir, index), '')
   }
 }

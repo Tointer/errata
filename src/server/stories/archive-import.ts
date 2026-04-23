@@ -2,9 +2,9 @@ import { join } from 'node:path'
 import { generateFragmentId } from '@/lib/fragment-ids'
 import { getContentRoot } from '../fragments/branches'
 import type { Associations, BranchesIndex, Fragment, ProseChain } from '../fragments/schema'
-import { getStoryDir } from '../storage/story-layout'
+import * as storyLayout from '../storage/story-layout'
 import { getStorageBackend } from '../storage/runtime'
-import { findBranchArchivePrefix, getMarkdownArchiveEntries } from './archive-format'
+import * as archiveFormat from './archive-format'
 
 export async function importMarkdownArchiveIntoStory(
   dataDir: string,
@@ -14,7 +14,7 @@ export async function importMarkdownArchiveIntoStory(
   const storage = getStorageBackend()
   const root = await getContentRoot(dataDir, storyId)
 
-  for (const { relativePath, content } of getMarkdownArchiveEntries(extracted)) {
+  for (const { relativePath, content } of archiveFormat.getMarkdownArchiveEntries(extracted)) {
     await storage.writeBytes(join(root, relativePath), content)
   }
 }
@@ -27,14 +27,14 @@ export async function importBranchedArchiveIntoStory(
   branchesKey: string,
 ): Promise<void> {
   const storage = getStorageBackend()
-  const storyDir = getStoryDir(dataDir, storyId)
+  const storyDir = storyLayout.getStoryDir(dataDir, storyId)
   const branchesIndex = JSON.parse(decoder.decode(extracted[branchesKey])) as BranchesIndex
   const idMap = buildBranchFragmentIdMap(extracted, decoder)
 
   await storage.writeJson(join(storyDir, 'branches.json'), branchesIndex)
 
   for (const branch of branchesIndex.branches) {
-    const branchPrefix = findBranchArchivePrefix(Object.keys(extracted), branch.id)
+    const branchPrefix = archiveFormat.findBranchArchivePrefix(Object.keys(extracted), branch.id)
     if (!branchPrefix) continue
 
     const branchDir = join(storyDir, 'branches', branch.id)

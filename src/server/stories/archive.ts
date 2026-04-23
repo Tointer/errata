@@ -3,14 +3,10 @@ import { createStory, getStory } from '../fragments/storage'
 import { getBranchesIndex } from '../fragments/branches'
 import type { StoryMeta } from '../fragments/schema'
 import { parseFrontmatter } from '../md-files/frontmatter'
-import { storyMetaFromMarkdown } from '../md-files/story-meta'
-import {
-  detectStoryArchiveImportMode,
-  getStoryArchiveEntryPath,
-  getStoryMetaArchiveKey,
-} from './archive-format'
-import { importBranchedArchiveIntoStory, importMarkdownArchiveIntoStory } from './archive-import'
-import { getStoryDir } from '../storage/story-layout'
+import * as storyMeta from '../md-files/story-meta'
+import * as archiveFormat from './archive-format'
+import * as archiveImport from './archive-import'
+import * as storyLayout from '../storage/story-layout'
 import { getStorageBackend } from '../storage/runtime'
 
 export interface ExportResult {
@@ -23,7 +19,7 @@ export async function exportStoryAsZip(
   storyId: string,
 ): Promise<ExportResult> {
   const storage = getStorageBackend()
-  const storyDir = getStoryDir(dataDir, storyId)
+  const storyDir = storyLayout.getStoryDir(dataDir, storyId)
   const story = await getStory(dataDir, storyId)
   if (!story) {
     throw new Error(`Story not found: ${storyId}`)
@@ -31,13 +27,13 @@ export async function exportStoryAsZip(
 
   const files = Object.fromEntries(
     Object.entries(await storage.readTree(storyDir)).map(([relativePath, content]) => [
-      getStoryArchiveEntryPath(relativePath),
+      archiveFormat.getStoryArchiveEntryPath(relativePath),
       content,
     ] as const),
   )
 
   const branchesIndex = await getBranchesIndex(dataDir, storyId)
-  files[getStoryArchiveEntryPath('branches.json')] = new TextEncoder().encode(
+  files[archiveFormat.getStoryArchiveEntryPath('branches.json')] = new TextEncoder().encode(
     JSON.stringify(branchesIndex, null, 2),
   )
 
@@ -68,7 +64,7 @@ export async function importStoryFromZip(
   const newStoryId = `story-${Date.now().toString(36)}`
   const now = new Date().toISOString()
 
-  const importMode = detectStoryArchiveImportMode(paths)
+  const importMode = archiveFormat.detectStoryArchiveImportMode(paths)
   if (!importMode) {
     throw new Error('Invalid archive: only current Errata story archives are supported')
   }
@@ -89,9 +85,9 @@ export async function importStoryFromZip(
   await createStory(dataDir, newMeta)
 
   if (importMode.type === 'branched') {
-    await importBranchedArchiveIntoStory(dataDir, newStoryId, extracted, decoder, importMode.branchesKey)
+    await archiveImport.importBranchedArchiveIntoStory(dataDir, newStoryId, extracted, decoder, importMode.branchesKey)
   } else {
-    await importMarkdownArchiveIntoStory(dataDir, newStoryId, extracted)
+    await archiveImport.importMarkdownArchiveIntoStory(dataDir, newStoryId, extracted)
   }
 
   return newMeta
@@ -102,13 +98,13 @@ function readStoryMetaFromArchive(
   extracted: Record<string, Uint8Array>,
   decoder: TextDecoder,
 ): StoryMeta {
-  const storyMetaKey = getStoryMetaArchiveKey(paths)
+  const storyMetaKey = archiveFormat.getStoryMetaArchiveKey(paths)
   if (!storyMetaKey) {
     throw new Error('Invalid archive: missing story metadata')
   }
 
   const parsed = parseFrontmatter(decoder.decode(extracted[storyMetaKey]))
-  const story = storyMetaFromMarkdown(parsed.attributes, parsed.body)
+  const story = storyMeta.storyMetaFromMarkdown(parsed.attributes, parsed.body)
   if (!story) {
     throw new Error('Invalid archive: could not parse story metadata')
   }

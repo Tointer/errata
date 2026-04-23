@@ -1,24 +1,9 @@
 import { join } from 'node:path'
 import type { Fragment, ProseChain, StoryMeta } from '@/server/fragments/schema'
 import { getProseChain } from '../fragments/prose-chain'
-import {
-  getCompiledStoryPath,
-  getStoryDir as getMarkdownStoryRoot,
-  getStoryInternalDir as getInternalStoryRoot,
-  getStoryMetaPath,
-} from '../storage/story-layout'
-import {
-  getFilenameDerivedFragmentId,
-  getFragmentFileName,
-  getFragmentFolder,
-  getProseFragmentIdFromFileName,
-  getTypeForVisibleFolder,
-  INTERNAL_MARKDOWN_DIRS,
-  isVisibleFilenameDerivedType,
-  MARKDOWN_FRAGMENT_DIRS,
-  STORY_DIRS,
-} from './fragment-layout'
-import { findMarkdownFragmentEntry, listFolderEntries, type MarkdownFragmentEntry } from './fragment-locator'
+import * as storyLayout from '../storage/story-layout'
+import * as fragmentLayout from './fragment-layout'
+import * as fragmentLocator from './fragment-locator'
 import {
   archiveMarkdownFragmentFile,
   deleteMarkdownFragmentFiles,
@@ -26,19 +11,10 @@ import {
   writeMarkdownFragmentFile,
 } from './markdown-fragment-files.ts'
 import { parseFrontmatter } from './frontmatter'
-import {
-  fragmentFromExplicitMarkdown,
-  serializeFragment,
-  visibleFragmentFromMarkdown,
-} from './markdown-fragment-codec'
+import * as markdownFragmentCodec from './markdown-fragment-codec'
 import { proseFragmentFromMarkdown } from './prose-metadata'
-import {
-  readFragmentInternalIndex,
-  removeFragmentInternalRecord,
-  resolveFragmentTimestamps,
-  upsertFragmentInternalRecord,
-} from '../storage/stores/fragment-internals'
-import { serializeStoryMeta, storyMetaFromMarkdown } from './story-meta'
+import * as fragmentInternals from '../storage/stores/fragment-internals'
+import * as storyMeta from './story-meta'
 import { createLogger } from '../logging/logger'
 import { getStorageBackend } from '../storage/runtime'
 
@@ -52,16 +28,16 @@ function sortFragments(fragments: Fragment[]): Fragment[] {
 }
 
 function buildFragmentFromEntry(
-  record: MarkdownFragmentEntry,
+  record: fragmentLocator.MarkdownFragmentEntry,
   parsed: { attributes: Record<string, unknown>; body: string },
-  internalIndex: Awaited<ReturnType<typeof readFragmentInternalIndex>>,
+  internalIndex: Awaited<ReturnType<typeof fragmentInternals.readFragmentInternalIndex>>,
 ): Fragment | null {
-  const visibleType = getTypeForVisibleFolder(record.folder)
+  const visibleType = fragmentLayout.getTypeForVisibleFolder(record.folder)
   const proseId = record.folder === 'Prose'
-    ? getProseFragmentIdFromFileName(record.entry)
+    ? fragmentLayout.getProseFragmentIdFromFileName(record.entry)
     : undefined
-  const visibleId = visibleType && isVisibleFilenameDerivedType(visibleType)
-    ? getFilenameDerivedFragmentId(visibleType, record.entry)
+  const visibleId = visibleType && fragmentLayout.isVisibleFilenameDerivedType(visibleType)
+    ? fragmentLayout.getFilenameDerivedFragmentId(visibleType, record.entry)
     : undefined
   const explicitId = typeof parsed.attributes.id === 'string' ? parsed.attributes.id : undefined
 
@@ -71,21 +47,21 @@ function buildFragmentFromEntry(
       parsed.attributes,
       parsed.body,
       internalIndex[proseId]?.prose,
-      resolveFragmentTimestamps(parsed.attributes, internalIndex[proseId]),
-      (attributes, body) => fragmentFromExplicitMarkdown(attributes, body, internalIndex[proseId]),
+      fragmentInternals.resolveFragmentTimestamps(parsed.attributes, internalIndex[proseId]),
+      (attributes, body) => markdownFragmentCodec.fragmentFromExplicitMarkdown(attributes, body, internalIndex[proseId]),
     )
   }
 
-  if (visibleType && isVisibleFilenameDerivedType(visibleType)) {
-    return visibleFragmentFromMarkdown(visibleType, record.entry, parsed.attributes, parsed.body, internalIndex[visibleId ?? ''])
+  if (visibleType && fragmentLayout.isVisibleFilenameDerivedType(visibleType)) {
+    return markdownFragmentCodec.visibleFragmentFromMarkdown(visibleType, record.entry, parsed.attributes, parsed.body, internalIndex[visibleId ?? ''])
   }
 
-  return fragmentFromExplicitMarkdown(parsed.attributes, parsed.body, explicitId ? internalIndex[explicitId] : undefined)
+  return markdownFragmentCodec.fragmentFromExplicitMarkdown(parsed.attributes, parsed.body, explicitId ? internalIndex[explicitId] : undefined)
 }
 
 async function readFragmentFromEntry(
-  record: MarkdownFragmentEntry,
-  internalIndex: Awaited<ReturnType<typeof readFragmentInternalIndex>>,
+  record: fragmentLocator.MarkdownFragmentEntry,
+  internalIndex: Awaited<ReturnType<typeof fragmentInternals.readFragmentInternalIndex>>,
 ): Promise<Fragment | null> {
   const storage = getStorageBackend()
   const raw = await storage.readTextIfExists(record.path)
@@ -98,7 +74,7 @@ async function loadFragmentsFromFolders(
   dataDir: string,
   storyId: string,
   folders: string[],
-  internalIndex: Awaited<ReturnType<typeof readFragmentInternalIndex>>,
+  internalIndex: Awaited<ReturnType<typeof fragmentInternals.readFragmentInternalIndex>>,
   options: {
     includeArchived?: boolean
     onlyArchived?: boolean
@@ -106,12 +82,12 @@ async function loadFragmentsFromFolders(
     logInvalid?: boolean
   },
 ): Promise<Fragment[]> {
-  const root = getMarkdownStoryRoot(dataDir, storyId)
+  const root = storyLayout.getStoryDir(dataDir, storyId)
   const fragments: Fragment[] = []
   const storyLogger = repositoryLogger.child({ storyId, extra: options.type ? { type: options.type } : undefined })
 
   for (const folder of folders) {
-    const entries = await listFolderEntries(join(root, folder), folder, options)
+    const entries = await fragmentLocator.listFolderEntries(join(root, folder), folder, options)
     for (const record of entries) {
       const fragment = await readFragmentFromEntry(record, internalIndex)
       if (!fragment) {
@@ -134,14 +110,14 @@ async function loadFragmentsFromFolders(
 
 export async function ensureMarkdownStoryLayout(dataDir: string, storyId: string): Promise<void> {
   const storage = getStorageBackend()
-  const root = getMarkdownStoryRoot(dataDir, storyId)
+  const root = storyLayout.getStoryDir(dataDir, storyId)
   await storage.ensureDir(root)
   await Promise.all([
-    ...STORY_DIRS.map((dirName) => storage.ensureDir(join(root, dirName))),
-    ...INTERNAL_MARKDOWN_DIRS.map((dirName) => storage.ensureDir(join(root, dirName))),
-    storage.ensureDir(getInternalStoryRoot(dataDir, storyId)),
+    ...fragmentLayout.STORY_DIRS.map((dirName) => storage.ensureDir(join(root, dirName))),
+    ...fragmentLayout.INTERNAL_MARKDOWN_DIRS.map((dirName) => storage.ensureDir(join(root, dirName))),
+    storage.ensureDir(storyLayout.getStoryInternalDir(dataDir, storyId)),
   ])
-  const compiledPath = getCompiledStoryPath(dataDir, storyId)
+  const compiledPath = storyLayout.getCompiledStoryPath(dataDir, storyId)
   if (!(await storage.exists(compiledPath))) {
     await storage.writeText(compiledPath, '')
   }
@@ -150,16 +126,16 @@ export async function ensureMarkdownStoryLayout(dataDir: string, storyId: string
 export async function syncStoryMarkdownMeta(dataDir: string, story: StoryMeta): Promise<void> {
   const storage = getStorageBackend()
   await ensureMarkdownStoryLayout(dataDir, story.id)
-  await storage.writeText(getStoryMetaPath(dataDir, story.id), serializeStoryMeta(story))
+  await storage.writeText(storyLayout.getStoryMetaPath(dataDir, story.id), storyMeta.serializeStoryMeta(story))
 }
 
 export async function loadMarkdownStoryMeta(dataDir: string, storyId: string): Promise<StoryMeta | null> {
   const storage = getStorageBackend()
-  const path = getStoryMetaPath(dataDir, storyId)
+  const path = storyLayout.getStoryMetaPath(dataDir, storyId)
   const raw = await storage.readTextIfExists(path)
   if (!raw) return null
   const parsed = parseFrontmatter(raw)
-  return storyMetaFromMarkdown(parsed.attributes, parsed.body)
+  return storyMeta.storyMetaFromMarkdown(parsed.attributes, parsed.body)
 }
 
 function findProseSectionIndex(chain: ProseChain | null, fragmentId: string): number | undefined {
@@ -170,7 +146,7 @@ function findProseSectionIndex(chain: ProseChain | null, fragmentId: string): nu
 
 export async function syncFragmentMarkdown(dataDir: string, storyId: string, fragment: Fragment): Promise<void> {
   await ensureMarkdownStoryLayout(dataDir, storyId)
-  await upsertFragmentInternalRecord(dataDir, storyId, fragment)
+  await fragmentInternals.upsertFragmentInternalRecord(dataDir, storyId, fragment)
 
   const chain = fragment.type === 'prose' || fragment.type === 'marker'
     ? await getProseChain(dataDir, storyId)
@@ -179,23 +155,23 @@ export async function syncFragmentMarkdown(dataDir: string, storyId: string, fra
     dataDir,
     storyId,
     fragment.id,
-    getFragmentFolder(fragment.type),
-    getFragmentFileName(fragment, findProseSectionIndex(chain, fragment.id)),
-    serializeFragment(fragment),
+    fragmentLayout.getFragmentFolder(fragment.type),
+    fragmentLayout.getFragmentFileName(fragment, findProseSectionIndex(chain, fragment.id)),
+    markdownFragmentCodec.serializeFragment(fragment),
   )
 }
 
 export async function deleteFragmentMarkdown(dataDir: string, storyId: string, fragmentId: string): Promise<void> {
   await deleteMarkdownFragmentFiles(dataDir, storyId, fragmentId)
-  await removeFragmentInternalRecord(dataDir, storyId, fragmentId)
+  await fragmentInternals.removeFragmentInternalRecord(dataDir, storyId, fragmentId)
 }
 
 export async function loadMarkdownFragmentById(dataDir: string, storyId: string, fragmentId: string): Promise<Fragment | null> {
-  const matches = await findMarkdownFragmentEntry(dataDir, storyId, fragmentId, { includeArchived: true })
+  const matches = await fragmentLocator.findMarkdownFragmentEntry(dataDir, storyId, fragmentId, { includeArchived: true })
   const match = matches[0]
   if (!match) return null
 
-  const internalIndex = await readFragmentInternalIndex(dataDir, storyId)
+  const internalIndex = await fragmentInternals.readFragmentInternalIndex(dataDir, storyId)
   return readFragmentFromEntry(match, internalIndex)
 }
 
@@ -205,11 +181,11 @@ export async function listMarkdownFragments(
   type?: string,
 ): Promise<Fragment[]> {
   const storage = getStorageBackend()
-  const root = getMarkdownStoryRoot(dataDir, storyId)
+  const root = storyLayout.getStoryDir(dataDir, storyId)
   if (!(await storage.exists(root))) return []
 
-  const folders = type ? [getFragmentFolder(type)] : [...MARKDOWN_FRAGMENT_DIRS]
-  const internalIndex = await readFragmentInternalIndex(dataDir, storyId)
+  const folders = type ? [fragmentLayout.getFragmentFolder(type)] : [...fragmentLayout.MARKDOWN_FRAGMENT_DIRS]
+  const internalIndex = await fragmentInternals.readFragmentInternalIndex(dataDir, storyId)
 
   return loadFragmentsFromFolders(dataDir, storyId, folders, internalIndex, {
     includeArchived: false,
@@ -228,7 +204,7 @@ export async function writeCompiledStoryMarkdown(
   const compiled = blocks
     .map((block) => `[[[${block.id}]]]\n${block.content.trimEnd()}`)
     .join('\n\n')
-  await storage.writeText(getCompiledStoryPath(dataDir, storyId), compiled ? `${compiled}\n` : '')
+  await storage.writeText(storyLayout.getCompiledStoryPath(dataDir, storyId), compiled ? `${compiled}\n` : '')
 }
 
 export async function syncCompiledStoryFromCurrentChain(dataDir: string, storyId: string): Promise<void> {
@@ -262,7 +238,7 @@ export async function syncProseMarkdownOrder(dataDir: string, storyId: string): 
 }
 
 export async function isMarkdownFragmentArchived(dataDir: string, storyId: string, fragmentId: string): Promise<boolean> {
-  const match = (await findMarkdownFragmentEntry(dataDir, storyId, fragmentId, { includeArchived: true }))[0]
+  const match = (await fragmentLocator.findMarkdownFragmentEntry(dataDir, storyId, fragmentId, { includeArchived: true }))[0]
   return Boolean(match?.archived)
 }
 
@@ -272,11 +248,11 @@ export async function listArchivedMarkdownFragments(
   type?: string,
 ): Promise<Fragment[]> {
   const storage = getStorageBackend()
-  const root = getMarkdownStoryRoot(dataDir, storyId)
+  const root = storyLayout.getStoryDir(dataDir, storyId)
   if (!(await storage.exists(root))) return []
 
-  const folders = type ? [getFragmentFolder(type)] : [...MARKDOWN_FRAGMENT_DIRS]
-  const internalIndex = await readFragmentInternalIndex(dataDir, storyId)
+  const folders = type ? [fragmentLayout.getFragmentFolder(type)] : [...fragmentLayout.MARKDOWN_FRAGMENT_DIRS]
+  const internalIndex = await fragmentInternals.readFragmentInternalIndex(dataDir, storyId)
 
   return loadFragmentsFromFolders(dataDir, storyId, folders, internalIndex, {
     includeArchived: true,
